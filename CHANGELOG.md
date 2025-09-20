@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2025-09-20
+
+### Changed
+- Documented `Configuration#safe_dup` behaviour and error handling in YARD.
+- Expanded error class documentation for clearer release guidance.
+
 ## [0.1.0] - 2025-09-20
 
 ### Added
