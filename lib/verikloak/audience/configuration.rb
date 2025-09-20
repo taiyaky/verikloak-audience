@@ -31,7 +31,7 @@ module Verikloak
         @profile         = :strict_single
         @required_aud    = []
         @resource_client = 'rails-api'
-        self.env_claims_key  = 'verikloak.user'
+        self.env_claims_key = 'verikloak.user'
         @suggest_in_logs = true
       end
 
@@ -63,6 +63,11 @@ module Verikloak
 
       private
 
+      # Attempt to duplicate a value while tolerating non-duplicable inputs.
+      # Returns `nil` when given nil and falls back to the original on duplication errors.
+      #
+      # @param value [Object, nil]
+      # @return [Object, nil]
       def safe_dup(value)
         return if value.nil?
 
