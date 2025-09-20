@@ -68,4 +68,11 @@ RSpec.describe Verikloak::Audience::Middleware do
       cfg.required_aud = []
     end
   end
+
+  it "treats non-hash claims as missing" do
+    app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims")
+    res = Rack::MockRequest.new(app).get("/", { "claims" => "garbage" })
+    expect(res.status).to eq 403
+    expect(res.body).to include "insufficient_audience"
+  end
 end

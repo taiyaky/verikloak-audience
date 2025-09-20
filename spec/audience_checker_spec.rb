@@ -68,4 +68,13 @@ RSpec.describe Verikloak::Audience::Checker do
     claims = { "aud" => ["rails-api"] }
     expect(described_class.ok?(claims, cfg)).to be true
   end
+
+  it "treats non-hash claims as empty when evaluating" do
+    cfg.profile = :resource_or_aud
+    expect(described_class.ok?("not a hash", cfg)).to be false
+  end
+
+  it "treats non-hash claims as empty when suggesting" do
+    expect(described_class.suggest("invalid", cfg)).to eq(:strict_single)
+  end
 end
