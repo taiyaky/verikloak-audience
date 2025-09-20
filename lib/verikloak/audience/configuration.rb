@@ -40,8 +40,8 @@ module Verikloak
       # @return [void]
       def initialize_copy(source)
         super
-        @profile         = source.profile
-        @required_aud    = source.required_aud.is_a?(Array) ? source.required_aud.dup : source.required_aud
+        @profile         = safe_dup(source.profile)
+        @required_aud    = duplicate_required_aud(source.required_aud)
         @resource_client = safe_dup(source.resource_client)
         @env_claims_key  = safe_dup(source.env_claims_key)
         @suggest_in_logs = source.suggest_in_logs
@@ -62,6 +62,14 @@ module Verikloak
         value.dup
       rescue TypeError
         value
+      end
+
+      def duplicate_required_aud(value)
+        return if value.nil?
+
+        return value.map { |item| safe_dup(item) } if value.is_a?(Array)
+
+        safe_dup(value)
       end
     end
   end
