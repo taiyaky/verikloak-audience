@@ -8,7 +8,10 @@ Gem::Specification.new do |spec|
   spec.authors       = ['taiyaky']
 
   spec.summary       = 'Audience profiles for Keycloak on top of Verikloak'
-  spec.description   = 'Rack middleware that enforces aud according to '
+  spec.description   = <<~DESC
+    Rack middleware that enforces audience checks with deployable profiles,
+    layering on top of Verikloak token verification.
+  DESC
 
   spec.homepage      = 'https://github.com/taiyaky/verikloak-audience'
   spec.license       = 'MIT'
