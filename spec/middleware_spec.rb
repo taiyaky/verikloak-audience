@@ -51,4 +51,41 @@ RSpec.describe Verikloak::Audience::Middleware do
       Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["rails-api", "account"] } })
     }.not_to output.to_stderr
   end
+
+  it "isolates middleware overrides from global configuration" do
+    Verikloak::Audience.configure do |cfg|
+      cfg.required_aud = ["base"]
+    end
+
+    first = described_class.new(inner_app, required_aud: ["override"])
+    second = described_class.new(inner_app)
+
+    expect(first.instance_variable_get(:@config).required_aud).to eq(["override"])
+    expect(Verikloak::Audience.config.required_aud).to eq(["base"])
+    expect(second.instance_variable_get(:@config).required_aud).to eq(["base"])
+  ensure
+    Verikloak::Audience.configure do |cfg|
+      cfg.required_aud = []
+    end
+  end
+
+  it "treats non-hash claims as missing" do
+    app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims")
+    res = Rack::MockRequest.new(app).get("/", { "claims" => "garbage" })
+    expect(res.status).to eq 403
+    expect(res.body).to include "insufficient_audience"
+  end
+
+  it "reads symbol env keys safely" do
+    middleware = described_class.new(inner_app, profile: :strict_single, required_aud: ["rails-api"], env_claims_key: :claims)
+    response = middleware.call({ claims: { "aud" => ["rails-api"] } })
+
+    expect(response[0]).to eq(200)
+  end
+
+  it "raises when unknown options are provided" do
+    expect {
+      described_class.new(inner_app, profile: :strict_single, foo: :bar)
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /unknown middleware option/)
+  end
 end

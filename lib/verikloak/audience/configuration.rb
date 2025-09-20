@@ -21,7 +21,8 @@ module Verikloak
     #   @return [Boolean]
     class Configuration
       attr_accessor :profile, :required_aud, :resource_client,
-                    :env_claims_key, :suggest_in_logs
+                    :suggest_in_logs
+      attr_reader :env_claims_key
 
       # Create a configuration with safe defaults.
       #
@@ -30,8 +31,21 @@ module Verikloak
         @profile         = :strict_single
         @required_aud    = []
         @resource_client = 'rails-api'
-        @env_claims_key  = 'verikloak.user'
+        self.env_claims_key = 'verikloak.user'
         @suggest_in_logs = true
+      end
+
+      # Ensure `dup` produces an independent copy.
+      #
+      # @param source [Configuration]
+      # @return [void]
+      def initialize_copy(source)
+        super
+        @profile         = safe_dup(source.profile)
+        @required_aud    = duplicate_required_aud(source.required_aud)
+        @resource_client = safe_dup(source.resource_client)
+        self.env_claims_key = safe_dup(source.env_claims_key)
+        @suggest_in_logs = source.suggest_in_logs
       end
 
       # Coerce `required_aud` into an array of strings.
@@ -39,6 +53,35 @@ module Verikloak
       # @return [Array<String>]
       def required_aud_list
         Array(required_aud).map(&:to_s)
+      end
+
+      # @param value [#to_s, nil]
+      # @return [void]
+      def env_claims_key=(value)
+        @env_claims_key = value&.to_s
+      end
+
+      private
+
+      # Attempt to duplicate a value while tolerating non-duplicable inputs.
+      # Returns `nil` when given nil and falls back to the original on duplication errors.
+      #
+      # @param value [Object, nil]
+      # @return [Object, nil]
+      def safe_dup(value)
+        return if value.nil?
+
+        value.dup
+      rescue TypeError
+        value
+      end
+
+      def duplicate_required_aud(value)
+        return if value.nil?
+
+        return value.map { |item| safe_dup(item) } if value.is_a?(Array)
+
+        safe_dup(value)
       end
     end
   end

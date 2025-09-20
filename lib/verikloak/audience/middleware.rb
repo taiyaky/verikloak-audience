@@ -22,7 +22,7 @@ module Verikloak
       # @option opts [Boolean] :suggest_in_logs
       def initialize(app, **opts)
         @app = app
-        @config = Verikloak::Audience.configure
+        @config = Verikloak::Audience.config.dup
         apply_overrides!(opts)
       end
 
@@ -31,7 +31,8 @@ module Verikloak
       # @param env [Hash] Rack environment
       # @return [Array(Integer, Hash, #each)] Rack response triple
       def call(env)
-        claims = env[@config.env_claims_key] || {}
+        env_key = @config.env_claims_key
+        claims = env[env_key] || env[env_key&.to_sym] || {}
         return @app.call(env) if Checker.ok?(claims, @config)
 
         if @config.suggest_in_logs
@@ -54,8 +55,16 @@ module Verikloak
       # @return [void]
       def apply_overrides!(opts)
         cfg = @config
+        opts.each_key do |key|
+          writer = "#{key}="
+          next if cfg.respond_to?(writer)
+
+          raise Verikloak::Audience::ConfigurationError,
+                "unknown middleware option :#{key}"
+        end
+
         opts.each do |k, v|
-          cfg.public_send("#{k}=", v) if cfg.respond_to?("#{k}=")
+          cfg.public_send("#{k}=", v)
         end
       end
     end

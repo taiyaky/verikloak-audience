@@ -7,6 +7,8 @@ module Verikloak
     # This module provides predicate helpers used by the middleware to decide
     # whether a given set of claims satisfies the configured profile.
     module Checker
+      VALID_PROFILES = %i[strict_single allow_account resource_or_aud].freeze
+
       module_function
 
       # Returns whether the given claims satisfy the configured profile.
@@ -15,8 +17,16 @@ module Verikloak
       # @param cfg [Verikloak::Audience::Configuration]
       # @return [Boolean]
       def ok?(claims, cfg)
-        profile = cfg.profile.to_sym
-        profile = :strict_single unless %i[strict_single allow_account resource_or_aud].include?(profile)
+        claims = normalize_claims(claims)
+
+        profile = cfg.profile
+        profile = profile.to_sym if profile.respond_to?(:to_sym)
+        profile = :strict_single if profile.nil?
+
+        unless VALID_PROFILES.include?(profile)
+          raise Verikloak::Audience::ConfigurationError,
+                "unknown audience profile #{cfg.profile.inspect}"
+        end
 
         case profile
         when :strict_single
@@ -77,6 +87,8 @@ module Verikloak
       # @param cfg [Verikloak::Audience::Configuration]
       # @return [:strict_single, :allow_account, :resource_or_aud]
       def suggest(claims, cfg)
+        claims = normalize_claims(claims)
+
         aud = Array(claims['aud']).map(&:to_s)
         req = cfg.required_aud_list
         has_roles = !Array(claims.dig('resource_access', cfg.resource_client.to_s, 'roles')).empty?
@@ -87,6 +99,27 @@ module Verikloak
 
         :strict_single
       end
+
+      # Normalize incoming claims to a Hash to guard against unexpected
+      # env payloads or middleware ordering issues.
+      #
+      # @param claims [Object]
+      # @return [Hash]
+      def normalize_claims(claims)
+        return {} if claims.nil?
+        return claims if claims.is_a?(Hash)
+
+        if claims.respond_to?(:to_hash)
+          coerced = claims.to_hash
+          return coerced if coerced.is_a?(Hash)
+        end
+
+        {}
+      rescue StandardError
+        {}
+      end
+      module_function :normalize_claims
+      private_class_method :normalize_claims
     end
   end
 end
