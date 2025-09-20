@@ -75,4 +75,17 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect(res.status).to eq 403
     expect(res.body).to include "insufficient_audience"
   end
+
+  it "reads symbol env keys safely" do
+    middleware = described_class.new(inner_app, profile: :strict_single, required_aud: ["rails-api"], env_claims_key: :claims)
+    response = middleware.call({ claims: { "aud" => ["rails-api"] } })
+
+    expect(response[0]).to eq(200)
+  end
+
+  it "raises when unknown options are provided" do
+    expect {
+      described_class.new(inner_app, profile: :strict_single, foo: :bar)
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /unknown middleware option/)
+  end
 end

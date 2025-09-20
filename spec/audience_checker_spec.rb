@@ -57,16 +57,17 @@ RSpec.describe Verikloak::Audience::Checker do
     expect(described_class.ok?(claims, cfg)).to be true
   end
 
-  it "falls back to strict_single when profile unknown" do
-    cfg.profile = :unknown_profile
-    claims = { "aud" => ["rails-api"] }
-    expect(described_class.ok?(claims, cfg)).to be true
-  end
-
   it "defaults to strict_single when profile is nil" do
     cfg.profile = nil
     claims = { "aud" => ["rails-api"] }
     expect(described_class.ok?(claims, cfg)).to be true
+  end
+
+  it "raises when profile is not recognized" do
+    cfg.profile = :unknown_profile
+    expect {
+      described_class.ok?({ "aud" => ["rails-api"] }, cfg)
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /unknown audience profile/)
   end
 
   it "treats non-hash claims as empty when evaluating" do

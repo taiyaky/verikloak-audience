@@ -21,7 +21,8 @@ module Verikloak
     #   @return [Boolean]
     class Configuration
       attr_accessor :profile, :required_aud, :resource_client,
-                    :env_claims_key, :suggest_in_logs
+                    :suggest_in_logs
+      attr_reader :env_claims_key
 
       # Create a configuration with safe defaults.
       #
@@ -30,7 +31,7 @@ module Verikloak
         @profile         = :strict_single
         @required_aud    = []
         @resource_client = 'rails-api'
-        @env_claims_key  = 'verikloak.user'
+        self.env_claims_key  = 'verikloak.user'
         @suggest_in_logs = true
       end
 
@@ -43,7 +44,7 @@ module Verikloak
         @profile         = safe_dup(source.profile)
         @required_aud    = duplicate_required_aud(source.required_aud)
         @resource_client = safe_dup(source.resource_client)
-        @env_claims_key  = safe_dup(source.env_claims_key)
+        self.env_claims_key = safe_dup(source.env_claims_key)
         @suggest_in_logs = source.suggest_in_logs
       end
 
@@ -52,6 +53,12 @@ module Verikloak
       # @return [Array<String>]
       def required_aud_list
         Array(required_aud).map(&:to_s)
+      end
+
+      # @param value [#to_s, nil]
+      # @return [void]
+      def env_claims_key=(value)
+        @env_claims_key = value&.to_s
       end
 
       private

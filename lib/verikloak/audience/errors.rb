@@ -30,5 +30,13 @@ module Verikloak
         super(msg, code: 'insufficient_audience', http_status: 403)
       end
     end
+
+    # Raised when configuration is invalid.
+    class ConfigurationError < Error
+      # @param msg [String]
+      def initialize(msg = 'invalid audience configuration')
+        super(msg, code: 'audience_configuration_error', http_status: 500)
+      end
+    end
   end
 end

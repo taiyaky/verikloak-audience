@@ -37,5 +37,12 @@ RSpec.describe Verikloak::Audience::Configuration do
     expect(cfg.resource_client).to eq "api"
     expect(cfg.env_claims_key).to eq "claims"
   end
+
+  it "normalizes env_claims_key to strings" do
+    cfg = described_class.new
+    cfg.env_claims_key = :claims
+
+    expect(cfg.env_claims_key).to eq("claims")
+  end
 end
 

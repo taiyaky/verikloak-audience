@@ -7,6 +7,8 @@ module Verikloak
     # This module provides predicate helpers used by the middleware to decide
     # whether a given set of claims satisfies the configured profile.
     module Checker
+      VALID_PROFILES = %i[strict_single allow_account resource_or_aud].freeze
+
       module_function
 
       # Returns whether the given claims satisfy the configured profile.
@@ -19,7 +21,12 @@ module Verikloak
 
         profile = cfg.profile
         profile = profile.to_sym if profile.respond_to?(:to_sym)
-        profile = :strict_single unless %i[strict_single allow_account resource_or_aud].include?(profile)
+        profile = :strict_single if profile.nil?
+
+        unless VALID_PROFILES.include?(profile)
+          raise Verikloak::Audience::ConfigurationError,
+                "unknown audience profile #{cfg.profile.inspect}"
+        end
 
         case profile
         when :strict_single
