@@ -15,7 +15,8 @@ module Verikloak
       # @param cfg [Verikloak::Audience::Configuration]
       # @return [Boolean]
       def ok?(claims, cfg)
-        profile = cfg.profile.to_sym
+        profile = cfg.profile
+        profile = profile.to_sym if profile.respond_to?(:to_sym)
         profile = :strict_single unless %i[strict_single allow_account resource_or_aud].include?(profile)
 
         case profile

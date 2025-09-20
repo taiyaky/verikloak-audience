@@ -34,11 +34,34 @@ module Verikloak
         @suggest_in_logs = true
       end
 
+      # Ensure `dup` produces an independent copy.
+      #
+      # @param source [Configuration]
+      # @return [void]
+      def initialize_copy(source)
+        super
+        @profile         = source.profile
+        @required_aud    = source.required_aud.is_a?(Array) ? source.required_aud.dup : source.required_aud
+        @resource_client = safe_dup(source.resource_client)
+        @env_claims_key  = safe_dup(source.env_claims_key)
+        @suggest_in_logs = source.suggest_in_logs
+      end
+
       # Coerce `required_aud` into an array of strings.
       #
       # @return [Array<String>]
       def required_aud_list
         Array(required_aud).map(&:to_s)
+      end
+
+      private
+
+      def safe_dup(value)
+        return if value.nil?
+
+        value.dup
+      rescue TypeError
+        value
       end
     end
   end

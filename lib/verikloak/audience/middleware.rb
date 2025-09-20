@@ -22,7 +22,7 @@ module Verikloak
       # @option opts [Boolean] :suggest_in_logs
       def initialize(app, **opts)
         @app = app
-        @config = Verikloak::Audience.configure
+        @config = Verikloak::Audience.config.dup
         apply_overrides!(opts)
       end
 

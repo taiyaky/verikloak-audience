@@ -51,4 +51,21 @@ RSpec.describe Verikloak::Audience::Middleware do
       Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["rails-api", "account"] } })
     }.not_to output.to_stderr
   end
+
+  it "isolates middleware overrides from global configuration" do
+    Verikloak::Audience.configure do |cfg|
+      cfg.required_aud = ["base"]
+    end
+
+    first = described_class.new(inner_app, required_aud: ["override"])
+    second = described_class.new(inner_app)
+
+    expect(first.instance_variable_get(:@config).required_aud).to eq(["override"])
+    expect(Verikloak::Audience.config.required_aud).to eq(["base"])
+    expect(second.instance_variable_get(:@config).required_aud).to eq(["base"])
+  ensure
+    Verikloak::Audience.configure do |cfg|
+      cfg.required_aud = []
+    end
+  end
 end

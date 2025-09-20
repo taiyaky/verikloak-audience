@@ -62,4 +62,10 @@ RSpec.describe Verikloak::Audience::Checker do
     claims = { "aud" => ["rails-api"] }
     expect(described_class.ok?(claims, cfg)).to be true
   end
+
+  it "defaults to strict_single when profile is nil" do
+    cfg.profile = nil
+    claims = { "aud" => ["rails-api"] }
+    expect(described_class.ok?(claims, cfg)).to be true
+  end
 end
