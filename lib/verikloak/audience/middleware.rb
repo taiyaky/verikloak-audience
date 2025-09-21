@@ -39,7 +39,8 @@ module Verikloak
         if @config.suggest_in_logs
           suggestion = Checker.suggest(claims, @config)
           aud_view = Array(claims['aud']).inspect
-          log_warning(env, "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
+          log_warning(env,
+                      "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
         end
 
         body = { error: 'insufficient_audience',
@@ -52,7 +53,7 @@ module Verikloak
 
       # Apply provided options to the configuration instance.
       #
-      # @param opts [Hash]
+      # @param opts [Hash] raw overrides provided to the middleware
       # @return [void]
       def apply_overrides!(opts)
         cfg = @config
@@ -69,9 +70,15 @@ module Verikloak
         end
       end
 
+      # Emit a warning for failed audience checks using request-scoped loggers
+      # when available.
+      #
+      # @param env [Hash] Rack environment
+      # @param message [String] warning payload
+      # @return [void]
       def log_warning(env, message)
         logger = env['verikloak.logger'] || env['rack.logger'] || env['action_dispatch.logger']
-        if logger&.respond_to?(:warn)
+        if logger.respond_to?(:warn)
           logger.warn(message)
         else
           warn(message)

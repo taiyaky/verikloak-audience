@@ -58,6 +58,11 @@ See [`examples/rack.ru`](examples/rack.ru) for a full Rack sample. In Rails, alw
 
 `env_claims_key` assumes the preceding `Verikloak::Middleware` populates the Rack env. If the middleware order changes, claims will be missing and the audience check will always reject.
 
+### Operational safeguards
+- Middleware initialisation now fails fast when `required_aud` is empty. When Rails loads via the supplied Railtie, `Verikloak::Audience.config.validate!` runs after boot so configuration mistakes surface during startup instead of returning 403 for every request.
+- When audience validation fails, the middleware consults `env['verikloak.logger']`, `env['rack.logger']`, and `env['action_dispatch.logger']` (in that order) before falling back to Ruby's `Kernel#warn`, keeping failure logs consistent with Rails and Verikloak observers.
+- For the `:resource_or_aud` profile, `resource_client` must match one of the values in `required_aud`. A single-element `required_aud` automatically infers the client id, ensuring the same client identifier is shared with downstream BFF/Pundit integrations.
+
 ## Testing
 All pull requests and pushes are automatically tested with [RSpec](https://rspec.info/) and [RuboCop](https://rubocop.org/) via GitHub Actions.
 See the CI badge at the top for current build status.

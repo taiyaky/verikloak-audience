@@ -24,7 +24,9 @@ unless defined?(Rails::Railtie)
       end
 
       def self.initializer(name, &block)
-        initializers << [name, block]
+        entry = [name, block]
+        initializers << entry
+        Rails::Railtie.initializers << entry unless equal?(Rails::Railtie)
       end
 
       def self.config
