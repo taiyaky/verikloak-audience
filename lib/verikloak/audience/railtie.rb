@@ -33,6 +33,12 @@ module Verikloak
         self.class.insert_middleware(app)
       end
 
+      initializer 'verikloak_audience.configuration' do
+        config.after_initialize do
+          Verikloak::Audience.config.validate!
+        end
+      end
+
       # Performs the insertion into the middleware stack when the core
       # Verikloak middleware is available. Extracted for testability without
       # requiring a full Rails boot process.

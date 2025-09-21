@@ -5,6 +5,14 @@ require "spec_helper"
 RSpec.describe Verikloak::Audience::Middleware do
   include Rack::Test::Methods
 
+  before do
+    Verikloak::Audience.configure do |cfg|
+      cfg.required_aud = []
+      cfg.profile = :strict_single
+      cfg.resource_client = Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+    end
+  end
+
   let(:inner_app) do
     lambda { |_env| [200, { "Content-Type" => "text/plain" }, ["ok"]] }
   end
@@ -36,6 +44,15 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect {
       Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["rails-api", "account"] } })
     }.to output(/suggestion profile=:allow_account/).to_stderr
+  end
+
+  it "prefers rack logger when available" do
+    app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", suggest_in_logs: true)
+    logger = instance_double("Logger")
+    expect(logger).to receive(:warn).with(/insufficient_audience/)
+    expect {
+      Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["account"] }, "rack.logger" => logger })
+    }.not_to output.to_stderr
   end
 
   it "accepts via resource_or_aud when roles exist" do
@@ -87,5 +104,11 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect {
       described_class.new(inner_app, profile: :strict_single, foo: :bar)
     }.to raise_error(Verikloak::Audience::ConfigurationError, /unknown middleware option/)
+  end
+
+  it "raises when required_aud is missing" do
+    expect {
+      described_class.new(inner_app)
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /required_aud/)
   end
 end

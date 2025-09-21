@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'verikloak/audience/errors'
+
 module Verikloak
   module Audience
     # Configuration holder for verikloak-audience.
@@ -20,6 +22,8 @@ module Verikloak
     #   Whether to log a suggestion when audience validation fails.
     #   @return [Boolean]
     class Configuration
+      DEFAULT_RESOURCE_CLIENT = 'rails-api'
+
       attr_accessor :profile, :required_aud, :resource_client,
                     :suggest_in_logs
       attr_reader :env_claims_key
@@ -30,7 +34,7 @@ module Verikloak
       def initialize
         @profile         = :strict_single
         @required_aud    = []
-        @resource_client = 'rails-api'
+        @resource_client = DEFAULT_RESOURCE_CLIENT
         self.env_claims_key = 'verikloak.user'
         @suggest_in_logs = true
       end
@@ -61,6 +65,25 @@ module Verikloak
         @env_claims_key = value&.to_s
       end
 
+      # Validate the configuration to ensure required values are present.
+      #
+      # @return [Configuration] the validated configuration
+      def validate!
+        audiences = required_aud_list
+        if audiences.empty?
+          raise Verikloak::Audience::ConfigurationError,
+                'required_aud must include at least one audience'
+        end
+
+        profile_name = profile
+        profile_name = profile_name.to_sym if profile_name.respond_to?(:to_sym)
+        profile_name ||= :strict_single
+
+        ensure_resource_client!(audiences) if profile_name == :resource_or_aud
+
+        self
+      end
+
       private
 
       # Attempt to duplicate a value while tolerating non-duplicable inputs.
@@ -76,12 +99,56 @@ module Verikloak
         value
       end
 
+      # Build a deep-ish copy of `required_aud` so that mutations on copies
+      # do not leak back into the original configuration instance.
+      #
+      # @param value [Array<String,Symbol>, String, Symbol, nil]
+      # @return [Array<String,Symbol>, String, Symbol, nil]
       def duplicate_required_aud(value)
         return if value.nil?
 
         return value.map { |item| safe_dup(item) } if value.is_a?(Array)
 
         safe_dup(value)
+      end
+
+      # Ensure that the configured `resource_client` fits the `required_aud`
+      # list when the :resource_or_aud profile is active. Attempts to infer
+      # the client id from `required_aud` when possible and raises when
+      # ambiguity remains.
+      #
+      # @param audiences [Array<String>] coerced required audiences
+      # @return [void]
+      def ensure_resource_client!(audiences)
+        client = resource_client.to_s
+
+        needs_inference = needs_resource_client_inference?(client, audiences)
+
+        if needs_inference
+          if audiences.one?
+            self.resource_client = audiences.first
+            client = resource_client.to_s
+          else
+            raise Verikloak::Audience::ConfigurationError,
+                  'resource_client must match one of required_aud when using :resource_or_aud profile'
+          end
+        end
+
+        return if audiences.include?(client)
+
+        raise Verikloak::Audience::ConfigurationError,
+              'resource_client must match one of required_aud when using :resource_or_aud profile'
+      end
+
+      # Decide whether the resource client should be inferred from the
+      # required audiences based on the current client value.
+      #
+      # @param client [String]
+      # @param audiences [Array<String>]
+      # @return [Boolean]
+      def needs_resource_client_inference?(client, audiences)
+        client.empty? ||
+          (client == DEFAULT_RESOURCE_CLIENT && !audiences.include?(client))
       end
     end
   end

@@ -44,5 +44,33 @@ RSpec.describe Verikloak::Audience::Configuration do
 
     expect(cfg.env_claims_key).to eq("claims")
   end
+
+  describe "#validate!" do
+    it "raises when required_aud is empty" do
+      cfg = described_class.new
+      cfg.required_aud = []
+
+      expect { cfg.validate! }.to raise_error(Verikloak::Audience::ConfigurationError)
+    end
+
+    it "infers resource_client from required_aud when profile resource_or_aud" do
+      cfg = described_class.new
+      cfg.profile = :resource_or_aud
+      cfg.required_aud = ['bff-api']
+      cfg.resource_client = described_class::DEFAULT_RESOURCE_CLIENT
+
+      expect(cfg.validate!.resource_client).to eq('bff-api')
+    end
+
+    it "raises when resource_client is not in required_aud" do
+      cfg = described_class.new
+      cfg.profile = :resource_or_aud
+      cfg.required_aud = %w[first second]
+      cfg.resource_client = 'other'
+
+      expect { cfg.validate! }.to raise_error(Verikloak::Audience::ConfigurationError,
+                                              /resource_client must match one of required_aud/)
+    end
+  end
 end
 
