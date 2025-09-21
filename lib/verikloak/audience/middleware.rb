@@ -24,6 +24,7 @@ module Verikloak
         @app = app
         @config = Verikloak::Audience.config.dup
         apply_overrides!(opts)
+        @config.validate!
       end
 
       # Evaluate the request against the audience profile.
@@ -38,7 +39,7 @@ module Verikloak
         if @config.suggest_in_logs
           suggestion = Checker.suggest(claims, @config)
           aud_view = Array(claims['aud']).inspect
-          warn("[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
+          log_warning(env, "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
         end
 
         body = { error: 'insufficient_audience',
@@ -65,6 +66,15 @@ module Verikloak
 
         opts.each do |k, v|
           cfg.public_send("#{k}=", v)
+        end
+      end
+
+      def log_warning(env, message)
+        logger = env['verikloak.logger'] || env['rack.logger'] || env['action_dispatch.logger']
+        if logger&.respond_to?(:warn)
+          logger.warn(message)
+        else
+          warn(message)
         end
       end
     end
