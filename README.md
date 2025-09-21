@@ -1,5 +1,10 @@
 # verikloak-audience
 
+[![CI](https://github.com/taiyaky/verikloak-audience/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/taiyaky/verikloak-audience/actions/workflows/ci.yml)
+[![Gem Version](https://img.shields.io/gem/v/verikloak-audience)](https://rubygems.org/gems/verikloak-audience)
+![Ruby Version](https://img.shields.io/badge/ruby-%3E%3D%203.1-blue)
+[![Downloads](https://img.shields.io/gem/dt/verikloak-audience)](https://rubygems.org/gems/verikloak-audience)
+
 Rack middleware for validating the `aud` claim of Keycloak-issued tokens on top of the Verikloak stack. It ships with deploy-friendly presets that address common Keycloak patterns such as `account` co-existence and `resource_access`-driven role enforcement.
 
 For the full error behaviour (response shapes, exception classes, logging hints), see [ERRORS.md](ERRORS.md).
