@@ -111,4 +111,18 @@ RSpec.describe Verikloak::Audience::Middleware do
       described_class.new(inner_app)
     }.to raise_error(Verikloak::Audience::ConfigurationError, /required_aud/)
   end
+
+  it "skips validation when Railtie indicates generator command" do
+    railtie = Class.new do
+      def self.skip_configuration_validation?
+        true
+      end
+    end
+
+    stub_const("Verikloak::Audience::Railtie", railtie)
+
+    expect {
+      described_class.new(inner_app)
+    }.not_to raise_error
+  end
 end

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2025-09-22
+
+### Fixed
+- Skip middleware configuration validation when Rails generator commands execute so `rails g verikloak:install` can boot without preconfigured audiences.
+
 ## [0.2.1] - 2025-09-22
 
 ### Fixed

@@ -24,7 +24,7 @@ module Verikloak
         @app = app
         @config = Verikloak::Audience.config.dup
         apply_overrides!(opts)
-        @config.validate!
+        @config.validate! unless skip_validation?
       end
 
       # Evaluate the request against the audience profile.
@@ -68,6 +68,17 @@ module Verikloak
         opts.each do |k, v|
           cfg.public_send("#{k}=", v)
         end
+      end
+
+      # Determine whether configuration validation should run. This allows
+      # Rails generators to boot without a fully-populated configuration since
+      # the install task is responsible for creating it.
+      #
+      # @return [Boolean]
+      def skip_validation?
+        return false unless defined?(::Verikloak::Audience::Railtie)
+
+        ::Verikloak::Audience::Railtie.skip_configuration_validation?
       end
 
       # Emit a warning for failed audience checks using request-scoped loggers
