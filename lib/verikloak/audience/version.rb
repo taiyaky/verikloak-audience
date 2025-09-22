@@ -4,6 +4,6 @@ module Verikloak
   module Audience
     # Current gem version.
     # @return [String]
-    VERSION = '0.2.3'
+    VERSION = '0.2.4'
   end
 end
