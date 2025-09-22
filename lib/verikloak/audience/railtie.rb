@@ -35,6 +35,8 @@ module Verikloak
 
       initializer 'verikloak_audience.configuration' do
         config.after_initialize do
+          next if Verikloak::Audience::Railtie.skip_configuration_validation?
+
           Verikloak::Audience.config.validate!
         end
       end
@@ -49,6 +51,35 @@ module Verikloak
         return unless defined?(::Verikloak::Middleware)
 
         app.middleware.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+      end
+
+      COMMANDS_SKIPPING_VALIDATION = %w[generate g destroy d].freeze
+
+      # Detect whether Rails is currently executing a generator-style command.
+      # Generators boot the application before configuration exists, so we
+      # temporarily skip validation to let the install task complete.
+      #
+      # @return [Boolean]
+      def self.skip_configuration_validation?
+        return false unless defined?(Rails::Generators)
+
+        command = first_rails_command
+        COMMANDS_SKIPPING_VALIDATION.include?(command)
+      end
+
+      # Capture the first non-option argument passed to the Rails CLI,
+      # ignoring wrapper tokens such as "rails".
+      #
+      # @return [String, nil]
+      def self.first_rails_command
+        ARGV.each do |arg|
+          next if arg.start_with?('-')
+          next if arg == 'rails'
+
+          return arg
+        end
+
+        nil
       end
     end
   end

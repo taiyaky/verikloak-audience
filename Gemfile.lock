@@ -1,9 +1,9 @@
 PATH
   remote: .
   specs:
-    verikloak-audience (0.2.0)
+    verikloak-audience (0.2.1)
       rack (>= 2.2, < 4.0)
-      verikloak (>= 0.1.5, < 1.0.0)
+      verikloak (>= 0.2.0, < 1.0.0)
 
 GEM
   remote: https://rubygems.org/
