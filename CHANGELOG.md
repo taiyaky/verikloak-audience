@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.4] - 2025-09-22
+
+### Fixed
+- Skip middleware validation even before `Rails::Generators` is loaded so `rails g verikloak:install` succeeds without a placeholder configuration.
+- Treat all `verikloak:*:install` generators as safe so additional installer tasks (e.g. `verikloak:pundit:install`) can run before configuration exists.
+
 ## [0.2.3] - 2025-09-22
 
 ### Fixed

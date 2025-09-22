@@ -54,10 +54,9 @@ module Verikloak
       end
 
       # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in
-      # the boot process. When that happens the first argument becomes the
-      # generator namespace (e.g. `verikloak:install`). Include it here so the
-      # install generator can run before `required_aud` is configured.
-      COMMANDS_SKIPPING_VALIDATION = %w[generate g destroy d verikloak:install].freeze
+      # the boot process. Treat `verikloak:*:install` generators as safe so they
+      # can run before configuration files exist.
+      COMMANDS_SKIPPING_VALIDATION = %w[generate g destroy d].freeze
 
       # Detect whether Rails is currently executing a generator-style command.
       # Generators boot the application before configuration exists, so we
@@ -65,10 +64,10 @@ module Verikloak
       #
       # @return [Boolean]
       def self.skip_configuration_validation?
-        return false unless defined?(Rails::Generators)
-
         command = first_rails_command
-        COMMANDS_SKIPPING_VALIDATION.include?(command)
+        return false unless command
+
+        COMMANDS_SKIPPING_VALIDATION.include?(command) || verikloak_install_generator?(command)
       end
 
       # Capture the first non-option argument passed to the Rails CLI,
@@ -84,6 +83,10 @@ module Verikloak
         end
 
         nil
+      end
+
+      def self.verikloak_install_generator?(command)
+        command.start_with?('verikloak:') && command.end_with?(':install')
       end
     end
   end
