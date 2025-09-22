@@ -77,6 +77,7 @@ module Verikloak
       # @return [Boolean]
       def skip_validation?
         return false unless defined?(::Verikloak::Audience::Railtie)
+        return false unless ::Verikloak::Audience::Railtie.respond_to?(:skip_configuration_validation?)
 
         ::Verikloak::Audience::Railtie.skip_configuration_validation?
       end
