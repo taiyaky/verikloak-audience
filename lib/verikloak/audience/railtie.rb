@@ -53,7 +53,11 @@ module Verikloak
         app.middleware.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
       end
 
-      COMMANDS_SKIPPING_VALIDATION = %w[generate g destroy d].freeze
+      # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in
+      # the boot process. When that happens the first argument becomes the
+      # generator namespace (e.g. `verikloak:install`). Include it here so the
+      # install generator can run before `required_aud` is configured.
+      COMMANDS_SKIPPING_VALIDATION = %w[generate g destroy d verikloak:install].freeze
 
       # Detect whether Rails is currently executing a generator-style command.
       # Generators boot the application before configuration exists, so we
