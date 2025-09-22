@@ -116,4 +116,28 @@ RSpec.describe Verikloak::Audience::Railtie do
     described_class.config.after_initialize_callbacks.clear
     ARGV.replace(original_argv)
   end
+
+  it 'skips validation when only the generator namespace remains in ARGV' do
+    expect(configuration_initializer).not_to be_nil
+
+    described_class.config.after_initialize_callbacks.clear
+
+    original_argv = ARGV.dup
+
+    stub_const('Rails::Generators', Module.new)
+    ARGV.replace(['verikloak:install'])
+
+    railtie = described_class.new
+    railtie.instance_eval(&configuration_initializer[1])
+
+    callback = described_class.config.after_initialize_callbacks.last
+    config_double = instance_double(Verikloak::Audience::Configuration)
+    allow(Verikloak::Audience).to receive(:config).and_return(config_double)
+    expect(config_double).not_to receive(:validate!)
+
+    callback.call
+  ensure
+    described_class.config.after_initialize_callbacks.clear
+    ARGV.replace(original_argv)
+  end
 end
