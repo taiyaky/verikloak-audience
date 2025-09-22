@@ -85,6 +85,11 @@ module Verikloak
         nil
       end
 
+      # Detect whether the provided CLI token refers to a Verikloak install
+      # generator (e.g. `verikloak:install`, `verikloak:pundit:install`).
+      #
+      # @param command [String, nil] first non-option argument from ARGV
+      # @return [Boolean]
       def self.verikloak_install_generator?(command)
         return false unless command.is_a?(String)
 
