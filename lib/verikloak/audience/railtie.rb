@@ -86,6 +86,8 @@ module Verikloak
       end
 
       def self.verikloak_install_generator?(command)
+        return false unless command.is_a?(String)
+
         command.start_with?('verikloak:') && command.end_with?(':install')
       end
     end
