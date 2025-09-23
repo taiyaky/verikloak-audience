@@ -30,15 +30,17 @@ For the full error behaviour (response shapes, exception classes, logging hints)
 bundle add verikloak-audience
 ```
 
-In Rails applications, generate the initializer that inserts the middleware:
+In Rails applications, generate the initializer that automatically inserts the middleware:
 
 ```bash
 rails g verikloak:audience:install
 ```
 
-## Rack / Rails usage
+This creates `config/initializers/verikloak_audience.rb` that will insert the audience middleware after the core Verikloak middleware once it's available.
 
-Insert **after** `Verikloak::Middleware`:
+## Manual Rack / Rails setup
+
+Alternatively, you can manually insert **after** `Verikloak::Middleware`:
 
 ```ruby
 # config/application.rb
