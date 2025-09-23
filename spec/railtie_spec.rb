@@ -55,6 +55,7 @@ RSpec.describe Verikloak::Audience::Railtie do
       # Define a dummy core middleware constant for the scope of the example
       module ::Verikloak; class Middleware; end; end
 
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(true)
       expect(middleware_stack).to receive(:insert_after)
         .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
 
@@ -69,8 +70,49 @@ RSpec.describe Verikloak::Audience::Railtie do
     if defined?(::Verikloak::Middleware)
       ::Verikloak.send(:remove_const, :Middleware)
     end
+    allow(middleware_stack).to receive(:include?).and_return(false)
+    expect(described_class).not_to receive(:warn_missing_core_middleware)
     expect(middleware_stack).not_to receive(:insert_after)
     described_class.insert_middleware(app)
+  end
+
+  it 'does nothing when Verikloak::Middleware is not in the stack' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
+      expect(described_class).to receive(:warn_missing_core_middleware)
+      expect(middleware_stack).not_to receive(:insert_after)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 'logs a warning when the core middleware is absent' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
+
+      logger = instance_double('Logger')
+      if defined?(::Rails)
+        ::Rails.singleton_class.send(:attr_accessor, :logger) unless ::Rails.respond_to?(:logger=)
+        ::Rails.logger = logger
+      else
+        stub_const('Rails', Module.new)
+        Rails.singleton_class.send(:attr_accessor, :logger)
+        Rails.logger = logger
+      end
+
+      expect(logger).to receive(:warn).with(described_class::WARNING_MESSAGE)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Rails.logger = nil if defined?(::Rails) && ::Rails.respond_to?(:logger=)
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
   end
 
   it 'validates configuration after Rails initialization' do

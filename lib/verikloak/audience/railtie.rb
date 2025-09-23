@@ -42,15 +42,70 @@ module Verikloak
       end
 
       # Performs the insertion into the middleware stack when the core
-      # Verikloak middleware is available. Extracted for testability without
-      # requiring a full Rails boot process.
+      # Verikloak middleware is available and already present. Extracted for
+      # testability without requiring a full Rails boot process.
       #
       # @param app [#middleware] An object exposing a Rack middleware stack via `#middleware`.
       # @return [void]
       def self.insert_middleware(app)
         return unless defined?(::Verikloak::Middleware)
 
-        app.middleware.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+        middleware_stack = app.middleware
+        return unless middleware_stack.respond_to?(:include?)
+
+        unless middleware_stack.include?(::Verikloak::Middleware)
+          warn_missing_core_middleware
+          return
+        end
+
+        middleware_stack.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+      end
+
+      WARNING_MESSAGE = <<~MSG
+        [verikloak-audience] Skipping automatic middleware insertion because ::Verikloak::Middleware
+        is not present in the Rails middleware stack.
+
+        To enable verikloak-audience, first ensure that the core Verikloak middleware (`Verikloak::Middleware`)
+        is added to your Rails middleware stack. Once the core middleware is present, you can run
+        `rails g verikloak:audience:install` to generate the initializer for the audience middleware,
+        or manually add:
+
+          config.middleware.insert_after Verikloak::Middleware, Verikloak::Audience::Middleware
+
+        This warning will disappear once the core middleware is properly configured and the audience
+        middleware is inserted.
+      MSG
+
+      # Logs a warning message when the core Verikloak middleware is missing
+      # from the Rails middleware stack. Uses the Rails logger if available,
+      # otherwise falls back to Kernel.warn for output.
+      #
+      # This method is called when automatic middleware insertion is skipped
+      # due to the absence of the required core middleware.
+      #
+      # @return [void]
+      def self.warn_missing_core_middleware
+        logger = rails_logger
+
+        if logger
+          logger.warn(WARNING_MESSAGE)
+        else
+          Kernel.warn(WARNING_MESSAGE)
+        end
+      end
+
+      # Retrieves the Rails application logger if available.
+      #
+      # This method safely attempts to access the Rails logger, returning nil
+      # if Rails is not defined, doesn't respond to the logger method, or if
+      # the logger itself is nil.
+      #
+      # @return [Logger, nil] the Rails logger instance, or nil if unavailable
+      def self.rails_logger
+        return unless defined?(::Rails)
+        return unless ::Rails.respond_to?(:logger)
+
+        ::Rails.logger
       end
 
       # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in
