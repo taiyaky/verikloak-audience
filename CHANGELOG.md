@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.5] - 2025-09-23
+
+### Changed
+- Use autoload for middleware to avoid circular require dependencies.
+- Improve module loading performance by deferring middleware class loading until accessed.
+
+### Added
+- Comprehensive test suite for standalone middleware require scenarios.
+- Test coverage for middleware functionality when loaded independently of main gem entrypoint.
+
 ## [0.2.4] - 2025-09-22
 
 ### Fixed
