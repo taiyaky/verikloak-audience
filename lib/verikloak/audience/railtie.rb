@@ -53,6 +53,10 @@ module Verikloak
         middleware_stack = app.middleware
         return unless middleware_stack.respond_to?(:include?)
 
+        if middleware_stack.include?(::Verikloak::Audience::Middleware)
+          return
+        end
+
         unless middleware_stack.include?(::Verikloak::Middleware)
           warn_missing_core_middleware
           return
