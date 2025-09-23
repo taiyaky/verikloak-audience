@@ -5,13 +5,14 @@ require 'verikloak/audience/version'
 require 'verikloak/audience/configuration'
 require 'verikloak/audience/errors'
 require 'verikloak/audience/checker'
-require 'verikloak/audience/middleware'
 require 'verikloak/audience/railtie' if defined?(Rails::Railtie)
 
 module Verikloak
   # Audience configuration entrypoint and helpers.
   # This file also requires the public components of the gem.
   module Audience
+    autoload :Middleware, 'verikloak/audience/middleware'
+
     class << self
       # Configure verikloak-audience.
       #
