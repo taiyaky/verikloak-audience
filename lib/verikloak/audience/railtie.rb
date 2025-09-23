@@ -42,15 +42,47 @@ module Verikloak
       end
 
       # Performs the insertion into the middleware stack when the core
-      # Verikloak middleware is available. Extracted for testability without
-      # requiring a full Rails boot process.
+      # Verikloak middleware is available and already present. Extracted for
+      # testability without requiring a full Rails boot process.
       #
       # @param app [#middleware] An object exposing a Rack middleware stack via `#middleware`.
       # @return [void]
       def self.insert_middleware(app)
         return unless defined?(::Verikloak::Middleware)
 
-        app.middleware.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+        middleware_stack = app.middleware
+        return unless middleware_stack.respond_to?(:include?)
+
+        unless middleware_stack.include?(::Verikloak::Middleware)
+          warn_missing_core_middleware
+          return
+        end
+
+        middleware_stack.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+      end
+
+      WARNING_MESSAGE = <<~MSG.freeze
+        [verikloak-audience] Skipping automatic middleware insertion because ::Verikloak::Middleware
+        is not present in the Rails middleware stack. Run `rails g verikloak:audience:install` after
+        setting up the core middleware (or manually add `config.middleware.insert_after Verikloak::Middleware,
+        Verikloak::Audience::Middleware`).
+      MSG
+
+      def self.warn_missing_core_middleware
+        logger = rails_logger
+
+        if logger&.respond_to?(:warn)
+          logger.warn(WARNING_MESSAGE)
+        else
+          Kernel.warn(WARNING_MESSAGE)
+        end
+      end
+
+      def self.rails_logger
+        return unless defined?(::Rails)
+        return unless ::Rails.respond_to?(:logger)
+
+        ::Rails.logger
       end
 
       # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in

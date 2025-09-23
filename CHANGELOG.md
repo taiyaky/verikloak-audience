@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- Rails generator `verikloak:audience:install` to create an initializer that inserts the audience middleware once the core Verikloak middleware is available.
+
 ## [0.2.5] - 2025-09-23
 
 ### Changed

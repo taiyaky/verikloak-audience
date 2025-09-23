@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+# Insert the audience middleware after the core Verikloak middleware once it
+# has been loaded into the application.
+if defined?(Rails) && Rails.respond_to?(:application)
+  Verikloak::Audience::Railtie.insert_middleware(Rails.application)
+end
