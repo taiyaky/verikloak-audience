@@ -18,9 +18,17 @@ unless defined?(Rails::Generators::Base)
             @_source_root
           end
 
-          def desc(*) = nil
-          def argument(*) = nil
-          def class_option(*) = nil
+          def desc(*)
+            nil
+          end
+
+          def argument(*)
+            nil
+          end
+
+          def class_option(*)
+            nil
+          end
         end
 
         attr_reader :destination_root
