@@ -44,7 +44,7 @@ module Verikloak
       # @param required [Array<String>]
       # @return [Boolean]
       def strict_single?(claims, required)
-        aud = Array(claims['aud']).map(&:to_s)
+        aud = normalized_audiences(claims)
         return false if required.empty?
 
         # Must contain all required and have no unexpected extra (order-insensitive)
@@ -57,7 +57,7 @@ module Verikloak
       # @param required [Array<String>]
       # @return [Boolean]
       def allow_account?(claims, required)
-        aud = Array(claims['aud']).map(&:to_s)
+        aud = normalized_audiences(claims)
         return false if required.empty?
 
         # Permit 'account' extra
@@ -89,13 +89,10 @@ module Verikloak
       def suggest(claims, cfg)
         claims = normalize_claims(claims)
 
-        aud = Array(claims['aud']).map(&:to_s)
-        req = cfg.required_aud_list
-        has_roles = !Array(claims.dig('resource_access', cfg.resource_client.to_s, 'roles')).empty?
-
-        return :strict_single if aud.sort == req.sort
-        return :allow_account if (aud - req) == ['account'] && (req - aud).empty?
-        return :resource_or_aud if has_roles
+        required = cfg.required_aud_list
+        return :strict_single if strict_single?(claims, required)
+        return :allow_account if allow_account?(claims, required)
+        return :resource_or_aud if resource_or_aud?(claims, cfg.resource_client.to_s, required)
 
         :strict_single
       end
@@ -120,6 +117,16 @@ module Verikloak
       end
       module_function :normalize_claims
       private_class_method :normalize_claims
+
+      # Normalize audience claims into a predictable array of strings.
+      #
+      # @param claims [Hash]
+      # @return [Array<String>]
+      def normalized_audiences(claims)
+        Array(claims['aud']).map(&:to_s)
+      end
+      module_function :normalized_audiences
+      private_class_method :normalized_audiences
     end
   end
 end

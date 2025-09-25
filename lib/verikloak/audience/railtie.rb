@@ -89,27 +89,15 @@ module Verikloak
       #
       # @return [void]
       def self.warn_missing_core_middleware
-        logger = rails_logger
+        logger = if defined?(::Rails) && ::Rails.respond_to?(:logger)
+                   ::Rails.logger
+                 end
 
         if logger
           logger.warn(WARNING_MESSAGE)
         else
           Kernel.warn(WARNING_MESSAGE)
         end
-      end
-
-      # Retrieves the Rails application logger if available.
-      #
-      # This method safely attempts to access the Rails logger, returning nil
-      # if Rails is not defined, doesn't respond to the logger method, or if
-      # the logger itself is nil.
-      #
-      # @return [Logger, nil] the Rails logger instance, or nil if unavailable
-      def self.rails_logger
-        return unless defined?(::Rails)
-        return unless ::Rails.respond_to?(:logger)
-
-        ::Rails.logger
       end
 
       # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in
