@@ -123,25 +123,32 @@ module Verikloak
       #
       # @return [Boolean]
       def self.skip_configuration_validation?
-        command = first_rails_command
-        return false unless command
+        tokens = first_cli_tokens
+        return false if tokens.empty?
 
-        COMMANDS_SKIPPING_VALIDATION.include?(command) || verikloak_install_generator?(command)
+        command = tokens.first
+        return true if COMMANDS_SKIPPING_VALIDATION.include?(command)
+
+        tokens.any? { |token| verikloak_install_generator?(token) }
       end
 
-      # Capture the first non-option argument passed to the Rails CLI,
-      # ignoring wrapper tokens such as "rails".
+      # Capture the first non-option arguments passed to the Rails CLI,
+      # ignoring wrapper tokens such as "rails". Only the first two tokens are
+      # relevant for generator detection, so we keep the return list short.
       #
-      # @return [String, nil]
-      def self.first_rails_command
+      # @return [Array<String>] ordered CLI tokens that may signal a generator
+      def self.first_cli_tokens
+        tokens = []
+
         ARGV.each do |arg|
           next if arg.start_with?('-')
           next if arg == 'rails'
 
-          return arg
+          tokens << arg
+          break if tokens.size >= 2
         end
 
-        nil
+        tokens
       end
 
       # Detect whether the provided CLI token refers to a Verikloak install
