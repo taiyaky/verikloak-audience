@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
-require 'rails/generators'
-require 'rails/generators/base'
+begin
+  require 'rails/generators'
+  require 'rails/generators/base'
+rescue LoadError
+  raise unless defined?(Rails::Generators::Base)
+end
 
 module Verikloak
   module Audience
@@ -14,7 +18,7 @@ module Verikloak
         source_root File.expand_path('templates', __dir__)
 
         def create_initializer
-          template 'verikloak_audience.rb.tt', 'config/initializers/verikloak_audience.rb'
+          template 'initializer.rb.erb', 'config/initializers/verikloak_audience.rb'
         end
       end
     end

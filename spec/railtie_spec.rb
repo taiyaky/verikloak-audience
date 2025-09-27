@@ -55,6 +55,7 @@ RSpec.describe Verikloak::Audience::Railtie do
       # Define a dummy core middleware constant for the scope of the example
       module ::Verikloak; class Middleware; end; end
 
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
       allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(true)
       expect(middleware_stack).to receive(:insert_after)
         .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
@@ -70,7 +71,8 @@ RSpec.describe Verikloak::Audience::Railtie do
     if defined?(::Verikloak::Middleware)
       ::Verikloak.send(:remove_const, :Middleware)
     end
-    allow(middleware_stack).to receive(:include?).and_return(false)
+    allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+    allow(middleware_stack).to receive(:include?).with(anything).and_return(false)
     expect(described_class).not_to receive(:warn_missing_core_middleware)
     expect(middleware_stack).not_to receive(:insert_after)
     described_class.insert_middleware(app)
@@ -80,6 +82,7 @@ RSpec.describe Verikloak::Audience::Railtie do
     begin
       module ::Verikloak; class Middleware; end; end
 
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
       allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
       expect(described_class).to receive(:warn_missing_core_middleware)
       expect(middleware_stack).not_to receive(:insert_after)
@@ -94,6 +97,7 @@ RSpec.describe Verikloak::Audience::Railtie do
     begin
       module ::Verikloak; class Middleware; end; end
 
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
       allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
 
       logger = instance_double('Logger')
@@ -229,5 +233,41 @@ RSpec.describe Verikloak::Audience::Railtie do
   ensure
     described_class.config.after_initialize_callbacks.clear
     ARGV.replace(original_argv)
+  end
+
+  it 'aligns env_claims_key with verikloak-rails configuration when available' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new('verikloak.custom', nil)
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    expect(Verikloak::Audience.config.env_claims_key).to eq('verikloak.custom')
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'derives required_aud and resource_client from verikloak-rails defaults when missing' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new(nil, ['custom-app'])
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    config = Verikloak::Audience.config
+    expect(config.required_aud_list).to eq(['custom-app'])
+    expect(config.resource_client).to eq('custom-app')
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
   end
 end

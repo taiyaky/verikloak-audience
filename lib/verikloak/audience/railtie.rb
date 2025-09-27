@@ -35,6 +35,7 @@ module Verikloak
 
       initializer 'verikloak_audience.configuration' do
         config.after_initialize do
+          self.class.apply_verikloak_rails_configuration
           next if Verikloak::Audience::Railtie.skip_configuration_validation?
 
           Verikloak::Audience.config.validate!
@@ -53,9 +54,7 @@ module Verikloak
         middleware_stack = app.middleware
         return unless middleware_stack.respond_to?(:include?)
 
-        if middleware_stack.include?(::Verikloak::Audience::Middleware)
-          return
-        end
+        return if middleware_stack.include?(::Verikloak::Audience::Middleware)
 
         unless middleware_stack.include?(::Verikloak::Middleware)
           warn_missing_core_middleware
@@ -89,9 +88,7 @@ module Verikloak
       #
       # @return [void]
       def self.warn_missing_core_middleware
-        logger = if defined?(::Rails) && ::Rails.respond_to?(:logger)
-                   ::Rails.logger
-                 end
+        logger = (::Rails.logger if defined?(::Rails) && ::Rails.respond_to?(:logger))
 
         if logger
           logger.warn(WARNING_MESSAGE)
@@ -148,6 +145,88 @@ module Verikloak
         return false unless command.is_a?(String)
 
         command.start_with?('verikloak:') && command.end_with?(':install')
+      end
+
+      class << self
+        # Synchronize configuration with verikloak-rails when it is present.
+        # Aligns env_claims_key, required_aud, and resource_client defaults so
+        # that both gems operate on the same Rack env payload and audience list.
+        #
+        # @return [void]
+        def apply_verikloak_rails_configuration
+          rails_config = verikloak_rails_config
+          return unless rails_config
+
+          Verikloak::Audience.configure do |cfg|
+            sync_env_claims_key(cfg, rails_config)
+            sync_required_aud(cfg, rails_config)
+            sync_resource_client(cfg, rails_config)
+          end
+        end
+
+        private
+
+        def verikloak_rails_config
+          return unless defined?(::Verikloak::Rails)
+          return unless ::Verikloak::Rails.respond_to?(:config)
+
+          ::Verikloak::Rails.config
+        rescue StandardError
+          nil
+        end
+
+        def sync_env_claims_key(cfg, rails_config)
+          return unless rails_config.respond_to?(:user_env_key)
+
+          user_key = rails_config.user_env_key
+          return if blank?(user_key)
+
+          current = cfg.env_claims_key
+          return unless current.nil? || current == Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY
+
+          cfg.env_claims_key = user_key
+        end
+
+        def sync_required_aud(cfg, rails_config)
+          return unless cfg_required_aud_blank?(cfg)
+          return unless rails_config.respond_to?(:audience)
+
+          audiences = normalized_audiences(rails_config.audience)
+          return if audiences.empty?
+
+          cfg.required_aud = audiences.size == 1 ? audiences.first : audiences
+        end
+
+        def sync_resource_client(cfg, rails_config)
+          return unless rails_config.respond_to?(:audience)
+
+          audiences = normalized_audiences(rails_config.audience)
+          return unless audiences.size == 1
+
+          current_client = cfg.resource_client
+          unless current_client.nil? || current_client.empty? || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+            return
+          end
+
+          cfg.resource_client = audiences.first
+        end
+
+        def cfg_required_aud_blank?(cfg)
+          blank?(cfg.required_aud)
+        end
+
+        def blank?(value)
+          return true if value.nil?
+          return true if value.respond_to?(:empty?) && value.empty?
+
+          value.to_s.empty?
+        end
+
+        def normalized_audiences(source)
+          return [] if blank?(source)
+
+          Array(source).map(&:to_s).reject(&:empty?)
+        end
       end
     end
   end

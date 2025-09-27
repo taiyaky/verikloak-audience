@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'fileutils'
 require 'tmpdir'
+require 'erb'
 
 # Provide a lightweight stub for Rails::Generators::Base so the generator can
 # be required without pulling in Rails during the test suite.
@@ -42,8 +43,10 @@ unless defined?(Rails::Generators::Base)
         def template(source, destination)
           source_path = File.expand_path(source, self.class.source_root)
           destination_path = File.expand_path(destination, destination_root)
+          template = ERB.new(File.read(source_path), trim_mode: '-')
+          rendered = template.result(instance_eval { binding })
           FileUtils.mkdir_p(File.dirname(destination_path))
-          FileUtils.cp(source_path, destination_path)
+          File.write(destination_path, rendered)
         end
       end
     end

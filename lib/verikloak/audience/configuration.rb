@@ -23,6 +23,7 @@ module Verikloak
     #   @return [Boolean]
     class Configuration
       DEFAULT_RESOURCE_CLIENT = 'rails-api'
+      DEFAULT_ENV_CLAIMS_KEY = 'verikloak.user'
 
       attr_accessor :profile, :required_aud, :resource_client,
                     :suggest_in_logs
@@ -35,7 +36,7 @@ module Verikloak
         @profile         = :strict_single
         @required_aud    = []
         @resource_client = DEFAULT_RESOURCE_CLIENT
-        self.env_claims_key = 'verikloak.user'
+        self.env_claims_key = DEFAULT_ENV_CLAIMS_KEY
         @suggest_in_logs = true
       end
 
