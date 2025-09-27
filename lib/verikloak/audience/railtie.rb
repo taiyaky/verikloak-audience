@@ -46,6 +46,9 @@ module Verikloak
       # Verikloak middleware is available and already present. Extracted for
       # testability without requiring a full Rails boot process.
       #
+      # Insert the audience middleware after the base Verikloak middleware when
+      # both are available on the stack.
+      #
       # @param app [#middleware] An object exposing a Rack middleware stack via `#middleware`.
       # @return [void]
       def self.insert_middleware(app)
@@ -166,6 +169,9 @@ module Verikloak
 
         private
 
+        # Resolve the verikloak-rails configuration object if the gem is loaded.
+        #
+        # @return [Verikloak::Rails::Configuration, nil]
         def verikloak_rails_config
           return unless defined?(::Verikloak::Rails)
           return unless ::Verikloak::Rails.respond_to?(:config)
@@ -175,6 +181,11 @@ module Verikloak
           nil
         end
 
+        # Align the environment claims key with the one configured in verikloak-rails.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
         def sync_env_claims_key(cfg, rails_config)
           return unless rails_config.respond_to?(:user_env_key)
 
@@ -187,6 +198,11 @@ module Verikloak
           cfg.env_claims_key = user_key
         end
 
+        # Populate required audiences from the verikloak-rails configuration when absent.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
         def sync_required_aud(cfg, rails_config)
           return unless cfg_required_aud_blank?(cfg)
           return unless rails_config.respond_to?(:audience)
@@ -197,6 +213,11 @@ module Verikloak
           cfg.required_aud = audiences.size == 1 ? audiences.first : audiences
         end
 
+        # Infer the resource client based on the configured audience when possible.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
         def sync_resource_client(cfg, rails_config)
           return unless rails_config.respond_to?(:audience)
 
@@ -204,26 +225,40 @@ module Verikloak
           return unless audiences.size == 1
 
           current_client = cfg.resource_client
-          return unless blank?(current_client) || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+          unless blank?(current_client) || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+            return
+          end
 
           cfg.resource_client = audiences.first
         end
 
+        # Determine whether the audience configuration is effectively empty.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @return [Boolean]
         def cfg_required_aud_blank?(cfg)
-          blank?(cfg.required_aud)
+          value_blank?(cfg.required_aud)
         end
 
-        def blank?(value)
+        # Generic blank? helper that tolerates nil, empty, or blank-ish values.
+        #
+        # @param value [Object]
+        # @return [Boolean]
+        def value_blank?(value)
           return true if value.nil?
           return true if value.respond_to?(:empty?) && value.empty?
 
           value.to_s.empty?
         end
 
-        def normalized_audiences(source)
-          return [] if blank?(source)
+        alias blank? value_blank?
 
-          Array(source).map(&:to_s).reject(&:empty?)
+        # Coerce the given source into an array of non-empty string audiences.
+        #
+        # @param source [Object]
+        # @return [Array<String>]
+        def normalized_audiences(source)
+          Array(source).compact.map(&:to_s).reject(&:empty?)
         end
       end
     end
