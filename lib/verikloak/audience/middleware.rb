@@ -57,16 +57,14 @@ module Verikloak
       # @return [void]
       def apply_overrides!(opts)
         cfg = @config
-        invalid_keys = opts.keys.reject { |key| cfg.respond_to?("#{key}=") }
-
-        unless invalid_keys.empty?
-          formatted = invalid_keys.map { |key| ":#{key}" }.join(', ')
-          raise Verikloak::Audience::ConfigurationError,
-                "unknown middleware option(s) #{formatted}"
-        end
-
         opts.each do |key, value|
-          cfg.public_send("#{key}=", value)
+          writer = "#{key}="
+          unless cfg.respond_to?(writer)
+            raise Verikloak::Audience::ConfigurationError,
+                  "unknown middleware option :#{key}"
+          end
+
+          cfg.public_send(writer, value)
         end
       end
 
