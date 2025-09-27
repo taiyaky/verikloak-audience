@@ -204,9 +204,7 @@ module Verikloak
           return unless audiences.size == 1
 
           current_client = cfg.resource_client
-          unless current_client.nil? || current_client.empty? || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
-            return
-          end
+          return unless blank?(current_client) || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
 
           cfg.resource_client = audiences.first
         end
