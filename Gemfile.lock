@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    verikloak-audience (0.2.6)
+    verikloak-audience (0.2.7)
       rack (>= 2.2, < 4.0)
       verikloak (>= 0.2.0, < 1.0.0)
 
