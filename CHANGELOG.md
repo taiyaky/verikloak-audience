@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.7] - 2025-09-27
+
+### Changed
+- Rails Railtie now syncs `env_claims_key`, `required_aud`, and `resource_client` defaults with verikloak-rails configuration after boot.
+- Generator template converted to ERB and bundled with the gem so `rails g verikloak:audience:install` produces the initializer without relying on Rails internals.
+- Middleware option validation tightened to fail fast on unknown overrides with clearer error messages.
+
+### Documentation
+- Added RubyDoc comments across the Railtie to clarify initializer responsibilities and helper methods.
+
 ## [0.2.6] - 2025-09-23
 
 ### Added

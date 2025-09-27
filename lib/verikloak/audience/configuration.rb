@@ -23,6 +23,7 @@ module Verikloak
     #   @return [Boolean]
     class Configuration
       DEFAULT_RESOURCE_CLIENT = 'rails-api'
+      DEFAULT_ENV_CLAIMS_KEY = 'verikloak.user'
 
       attr_accessor :profile, :required_aud, :resource_client,
                     :suggest_in_logs
@@ -35,7 +36,7 @@ module Verikloak
         @profile         = :strict_single
         @required_aud    = []
         @resource_client = DEFAULT_RESOURCE_CLIENT
-        self.env_claims_key = 'verikloak.user'
+        self.env_claims_key = DEFAULT_ENV_CLAIMS_KEY
         @suggest_in_logs = true
       end
 
@@ -121,23 +122,19 @@ module Verikloak
       # @return [void]
       def ensure_resource_client!(audiences)
         client = resource_client.to_s
+        error_msg = 'resource_client must match one of required_aud when using :resource_or_aud profile'
 
-        needs_inference = needs_resource_client_inference?(client, audiences)
+        if needs_resource_client_inference?(client, audiences)
+          raise Verikloak::Audience::ConfigurationError, error_msg unless audiences.one?
 
-        if needs_inference
-          if audiences.one?
-            self.resource_client = audiences.first
-            client = resource_client.to_s
-          else
-            raise Verikloak::Audience::ConfigurationError,
-                  'resource_client must match one of required_aud when using :resource_or_aud profile'
-          end
+          self.resource_client = audiences.first
+          client = resource_client.to_s
+
         end
 
         return if audiences.include?(client)
 
-        raise Verikloak::Audience::ConfigurationError,
-              'resource_client must match one of required_aud when using :resource_or_aud profile'
+        raise Verikloak::Audience::ConfigurationError, error_msg
       end
 
       # Decide whether the resource client should be inferred from the

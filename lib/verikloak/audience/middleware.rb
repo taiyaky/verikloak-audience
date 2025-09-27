@@ -57,16 +57,14 @@ module Verikloak
       # @return [void]
       def apply_overrides!(opts)
         cfg = @config
-        opts.each_key do |key|
+        opts.each do |key, value|
           writer = "#{key}="
-          next if cfg.respond_to?(writer)
+          unless cfg.respond_to?(writer)
+            raise Verikloak::Audience::ConfigurationError,
+                  "unknown middleware option :#{key}"
+          end
 
-          raise Verikloak::Audience::ConfigurationError,
-                "unknown middleware option :#{key}"
-        end
-
-        opts.each do |k, v|
-          cfg.public_send("#{k}=", v)
+          cfg.public_send(writer, value)
         end
       end
 
@@ -90,11 +88,9 @@ module Verikloak
       # @return [void]
       def log_warning(env, message)
         logger = env['verikloak.logger'] || env['rack.logger'] || env['action_dispatch.logger']
-        if logger.respond_to?(:warn)
-          logger.warn(message)
-        else
-          warn(message)
-        end
+        return logger.warn(message) if logger.respond_to?(:warn)
+
+        Kernel.warn(message)
       end
     end
   end

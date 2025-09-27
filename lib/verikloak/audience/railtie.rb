@@ -35,6 +35,7 @@ module Verikloak
 
       initializer 'verikloak_audience.configuration' do
         config.after_initialize do
+          self.class.apply_verikloak_rails_configuration
           next if Verikloak::Audience::Railtie.skip_configuration_validation?
 
           Verikloak::Audience.config.validate!
@@ -45,6 +46,9 @@ module Verikloak
       # Verikloak middleware is available and already present. Extracted for
       # testability without requiring a full Rails boot process.
       #
+      # Insert the audience middleware after the base Verikloak middleware when
+      # both are available on the stack.
+      #
       # @param app [#middleware] An object exposing a Rack middleware stack via `#middleware`.
       # @return [void]
       def self.insert_middleware(app)
@@ -52,6 +56,8 @@ module Verikloak
 
         middleware_stack = app.middleware
         return unless middleware_stack.respond_to?(:include?)
+
+        return if middleware_stack.include?(::Verikloak::Audience::Middleware)
 
         unless middleware_stack.include?(::Verikloak::Middleware)
           warn_missing_core_middleware
@@ -85,27 +91,13 @@ module Verikloak
       #
       # @return [void]
       def self.warn_missing_core_middleware
-        logger = rails_logger
+        logger = (::Rails.logger if defined?(::Rails) && ::Rails.respond_to?(:logger))
 
         if logger
           logger.warn(WARNING_MESSAGE)
         else
           Kernel.warn(WARNING_MESSAGE)
         end
-      end
-
-      # Retrieves the Rails application logger if available.
-      #
-      # This method safely attempts to access the Rails logger, returning nil
-      # if Rails is not defined, doesn't respond to the logger method, or if
-      # the logger itself is nil.
-      #
-      # @return [Logger, nil] the Rails logger instance, or nil if unavailable
-      def self.rails_logger
-        return unless defined?(::Rails)
-        return unless ::Rails.respond_to?(:logger)
-
-        ::Rails.logger
       end
 
       # Rails short commands (`g`, `d`) are stripped from ARGV fairly early in
@@ -119,25 +111,32 @@ module Verikloak
       #
       # @return [Boolean]
       def self.skip_configuration_validation?
-        command = first_rails_command
-        return false unless command
+        tokens = first_cli_tokens
+        return false if tokens.empty?
 
-        COMMANDS_SKIPPING_VALIDATION.include?(command) || verikloak_install_generator?(command)
+        command = tokens.first
+        return true if COMMANDS_SKIPPING_VALIDATION.include?(command)
+
+        tokens.any? { |token| verikloak_install_generator?(token) }
       end
 
-      # Capture the first non-option argument passed to the Rails CLI,
-      # ignoring wrapper tokens such as "rails".
+      # Capture the first non-option arguments passed to the Rails CLI,
+      # ignoring wrapper tokens such as "rails". Only the first two tokens are
+      # relevant for generator detection, so we keep the return list short.
       #
-      # @return [String, nil]
-      def self.first_rails_command
+      # @return [Array<String>] ordered CLI tokens that may signal a generator
+      def self.first_cli_tokens
+        tokens = []
+
         ARGV.each do |arg|
           next if arg.start_with?('-')
           next if arg == 'rails'
 
-          return arg
+          tokens << arg
+          break if tokens.size >= 2
         end
 
-        nil
+        tokens
       end
 
       # Detect whether the provided CLI token refers to a Verikloak install
@@ -149,6 +148,118 @@ module Verikloak
         return false unless command.is_a?(String)
 
         command.start_with?('verikloak:') && command.end_with?(':install')
+      end
+
+      class << self
+        # Synchronize configuration with verikloak-rails when it is present.
+        # Aligns env_claims_key, required_aud, and resource_client defaults so
+        # that both gems operate on the same Rack env payload and audience list.
+        #
+        # @return [void]
+        def apply_verikloak_rails_configuration
+          rails_config = verikloak_rails_config
+          return unless rails_config
+
+          Verikloak::Audience.configure do |cfg|
+            sync_env_claims_key(cfg, rails_config)
+            sync_required_aud(cfg, rails_config)
+            sync_resource_client(cfg, rails_config)
+          end
+        end
+
+        private
+
+        # Resolve the verikloak-rails configuration object if the gem is loaded.
+        #
+        # @return [Verikloak::Rails::Configuration, nil]
+        def verikloak_rails_config
+          return unless defined?(::Verikloak::Rails)
+          return unless ::Verikloak::Rails.respond_to?(:config)
+
+          ::Verikloak::Rails.config
+        rescue StandardError
+          nil
+        end
+
+        # Align the environment claims key with the one configured in verikloak-rails.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
+        def sync_env_claims_key(cfg, rails_config)
+          return unless rails_config.respond_to?(:user_env_key)
+
+          user_key = rails_config.user_env_key
+          return if blank?(user_key)
+
+          current = cfg.env_claims_key
+          return unless current.nil? || current == Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY
+
+          cfg.env_claims_key = user_key
+        end
+
+        # Populate required audiences from the verikloak-rails configuration when absent.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
+        def sync_required_aud(cfg, rails_config)
+          return unless cfg_required_aud_blank?(cfg)
+          return unless rails_config.respond_to?(:audience)
+
+          audiences = normalized_audiences(rails_config.audience)
+          return if audiences.empty?
+
+          cfg.required_aud = audiences.size == 1 ? audiences.first : audiences
+        end
+
+        # Infer the resource client based on the configured audience when possible.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @param rails_config [Verikloak::Rails::Configuration]
+        # @return [void]
+        def sync_resource_client(cfg, rails_config)
+          return unless rails_config.respond_to?(:audience)
+
+          audiences = normalized_audiences(rails_config.audience)
+          return unless audiences.size == 1
+
+          current_client = cfg.resource_client
+          unless blank?(current_client) || current_client == Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+            return
+          end
+
+          cfg.resource_client = audiences.first
+        end
+
+        # Determine whether the audience configuration is effectively empty.
+        #
+        # @param cfg [Verikloak::Audience::Configuration]
+        # @return [Boolean]
+        def cfg_required_aud_blank?(cfg)
+          value_blank?(cfg.required_aud)
+        end
+
+        # Generic blank? helper that tolerates nil, empty, or blank-ish values.
+        #
+        # @param value [Object]
+        # @return [Boolean]
+        def value_blank?(value)
+          return true if value.nil?
+          return true if value.respond_to?(:empty?) && value.empty?
+
+          value.to_s.empty?
+        end
+
+        alias blank? value_blank?
+
+        # Coerce the given source into an array of non-empty string audiences.
+        #
+        # @param source [Object]
+        # @return [Array<String>]
+        def normalized_audiences(source)
+          Array(source).compact.map(&:to_s).reject(&:empty?)
+        end
       end
     end
   end
