@@ -5,9 +5,6 @@ require "fileutils"
 RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
   before do
     # Provide a fake Rails::Generators base with minimal API
-    stub_const('Rails', Module.new)
-    stub_const('Rails::Generators', Module.new)
-
     base_class = Class.new do
       class << self
         def source_root(path = nil)
@@ -19,7 +16,7 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
         def class_option(*); end
       end
 
-      def initialize(args = [], options = {})
+      def initialize(_args = [], options = {})
         @options = options
       end
 
@@ -34,20 +31,24 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
       end
     end
 
+    stub_const('Rails', Module.new)
+    stub_const('Rails::Generators', Module.new)
     stub_const('Rails::Generators::Base', base_class)
 
-    @added_fake_feature = false
-    unless $LOADED_FEATURES.include?('rails/generators')
-      $LOADED_FEATURES << 'rails/generators'
-      @added_fake_feature = true
+    original_require = Kernel.instance_method(:require)
+    allow_any_instance_of(Object).to receive(:require) do |instance, path|
+      if path == 'rails/generators'
+        true
+      else
+        original_require.bind(instance).call(path)
+      end
     end
 
-    # Load the generator file with the stubs in place
-    load File.expand_path('../lib/generators/verikloak/audience/install/install_generator.rb', __dir__)
-  end
+    if defined?(Verikloak::Audience::Generators::InstallGenerator)
+      Verikloak::Audience::Generators.send(:remove_const, :InstallGenerator)
+    end
 
-  after do
-    $LOADED_FEATURES.delete('rails/generators') if @added_fake_feature
+    load File.expand_path('../lib/generators/verikloak/audience/install/install_generator.rb', __dir__)
   end
 
   it "creates initializer" do
