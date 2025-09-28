@@ -1,11 +1,6 @@
 # frozen_string_literal: true
 
-begin
-  require 'rails/generators'
-  require 'rails/generators/base'
-rescue LoadError
-  raise unless defined?(Rails::Generators::Base)
-end
+require 'rails/generators'
 
 module Verikloak
   module Audience
@@ -14,8 +9,10 @@ module Verikloak
       # application. This generator creates an initializer that inserts the
       # audience middleware after the core Verikloak middleware once it is
       # available.
-      class InstallGenerator < Rails::Generators::Base
+      class InstallGenerator < ::Rails::Generators::Base
         source_root File.expand_path('templates', __dir__)
+
+        desc 'Creates an initializer for verikloak-audience middleware integration.'
 
         def create_initializer
           template 'initializer.rb.erb', 'config/initializers/verikloak_audience.rb'

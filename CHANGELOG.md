@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.8] - 2025-09-28
+
+### Changed
+- Require `rails/generators` directly in the install generator and inherit via `::Rails::Generators::Base` to avoid constant lookup issues in non-Rails contexts.
+- Document the generator purpose with a `desc` string so `rails g --help` includes a clearer description.
+
+### Fixed
+- Stub Thor semantics in the generator spec and restore `tmpdir` usage so error handling tests assert `Thor::Error`, matching the real generator behavior.
+- Ensure the generator spec recreates missing template and destination conflict scenarios using the same API surface Rails provides.
+
 ## [0.2.7] - 2025-09-27
 
 ### Changed
