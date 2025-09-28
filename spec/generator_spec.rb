@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 require "spec_helper"
 require "fileutils"
+require "tmpdir"
 
 RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
   before do
     # Provide a fake Rails::Generators base with minimal API
+    stub_const('Thor::Error', Class.new(StandardError))
+
     base_class = Class.new do
       class << self
         def source_root(path = nil)
@@ -12,7 +15,7 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
           @source_root
         end
 
-        def desc(*); end
+        def desc(_description = nil); end
         def class_option(*); end
       end
 
@@ -26,6 +29,7 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
 
       def template(src, dest)
         src_path = File.join(self.class.source_root, src)
+        raise Thor::Error, "Could not find template #{src}" unless File.exist?(src_path)
         FileUtils.mkdir_p(File.dirname(dest))
         FileUtils.cp(src_path, dest)
       end
@@ -107,7 +111,7 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
           
           generator = Verikloak::Audience::Generators::InstallGenerator.new
           
-          expect { generator.create_initializer }.to raise_error(Errno::ENOENT)
+          expect { generator.create_initializer }.to raise_error(Thor::Error)
         end
       end
     end
