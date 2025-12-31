@@ -2,6 +2,10 @@
 
 # Insert the audience middleware after the core Verikloak middleware once it
 # has been loaded into the application.
+#
+# The Railtie's insert_middleware method includes internal guards to prevent
+# duplicate insertion when both the railtie initializer and this generated
+# initializer are loaded. This is safe to call multiple times.
 if defined?(Rails) && Rails.respond_to?(:application)
   Verikloak::Audience::Railtie.insert_middleware(Rails.application)
 end

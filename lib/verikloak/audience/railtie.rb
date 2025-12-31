@@ -28,7 +28,9 @@ module Verikloak
       # when available.
       #
       # @param app [Rails::Application] the Rails application instance
-      initializer 'verikloak_audience.middleware' do |app|
+      initializer 'verikloak_audience.middleware',
+                  after: 'verikloak.configure',
+                  before: :build_middleware_stack do |app|
         # Insert automatically after core verikloak if present
         self.class.insert_middleware(app)
       end
@@ -42,6 +44,17 @@ module Verikloak
         end
       end
 
+      # Tracks whether middleware insertion has been attempted to prevent
+      # duplicate insertions when both railtie and generator initializer run.
+      # In Rails 8.x+, middleware operations may be queued and `include?` may
+      # not reflect pending insertions, so we use this flag as an additional
+      # safeguard.
+      @middleware_insertion_attempted = false
+
+      class << self
+        attr_accessor :middleware_insertion_attempted
+      end
+
       # Performs the insertion into the middleware stack when the core
       # Verikloak middleware is available and already present. Extracted for
       # testability without requiring a full Rails boot process.
@@ -49,22 +62,72 @@ module Verikloak
       # Insert the audience middleware after the base Verikloak middleware when
       # both are available on the stack.
       #
+      # In Rails 8.x+, middleware stack operations may be queued rather than
+      # immediately applied, so `include?` checks may return false even when
+      # the middleware will be inserted. We use `insert_after` with exception
+      # handling to gracefully handle this case.
+      #
       # @param app [#middleware] An object exposing a Rack middleware stack via `#middleware`.
       # @return [void]
       def self.insert_middleware(app)
         return unless defined?(::Verikloak::Middleware)
 
-        middleware_stack = app.middleware
-        return unless middleware_stack.respond_to?(:include?)
+        # Skip if we have already attempted insertion (handles Rails 8+ queued operations)
+        return if middleware_insertion_attempted
 
-        return if middleware_stack.include?(::Verikloak::Audience::Middleware)
+        # Use app.config.middleware for queued operations in Rails 8.x+
+        # This ensures the insert_after operation is queued and applied during
+        # build_middleware_stack, maintaining proper ordering with verikloak-rails
+        middleware_stack = app.respond_to?(:config) ? app.config.middleware : app.middleware
 
-        unless middleware_stack.include?(::Verikloak::Middleware)
-          warn_missing_core_middleware
+        # Skip if already present (avoid duplicate insertion)
+        if middleware_stack.respond_to?(:include?) &&
+           middleware_stack.include?(::Verikloak::Audience::Middleware)
           return
         end
 
-        middleware_stack.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+        # Mark as attempted before insertion to prevent concurrent/subsequent calls
+        self.middleware_insertion_attempted = true
+
+        # Attempt to insert after the core Verikloak middleware.
+        # In Rails 8.x+, the middleware may be queued but not yet visible via include?,
+        # so we try the insertion and handle any exceptions gracefully.
+        begin
+          middleware_stack.insert_after ::Verikloak::Middleware, ::Verikloak::Audience::Middleware
+        rescue StandardError => e
+          # Handle middleware not found errors (varies by Rails version):
+          # - Rails 8+: RuntimeError with "No such middleware" message
+          # - Earlier: ActionDispatch::MiddlewareStack::MiddlewareNotFound
+          raise unless middleware_not_found_error?(e)
+
+          warn_missing_core_middleware
+        end
+      end
+
+      # Determines if the given exception indicates a middleware not found error.
+      # This handles variations across Rails versions:
+      # - Rails 8+: RuntimeError with "No such middleware" message
+      # - Rails 7 and earlier: ActionDispatch::MiddlewareStack::MiddlewareNotFound
+      #
+      # @param error [StandardError] the exception to check
+      # @return [Boolean] true if the error indicates missing middleware
+      def self.middleware_not_found_error?(error)
+        # Check exception class name (works for Rails 7's MiddlewareNotFound)
+        return true if error.class.name.to_s.include?('MiddlewareNotFound')
+
+        # Check message patterns for Rails 8+ RuntimeError
+        message = error.message.to_s
+        message.include?('No such middleware') ||
+          message.include?('does not exist') ||
+          message.match?(/middleware.*not found/i)
+      end
+
+      # Resets the insertion flag. Primarily used for testing to allow
+      # multiple insertion attempts within the same process.
+      #
+      # @return [void]
+      def self.reset_middleware_insertion_flag!
+        self.middleware_insertion_attempted = false
       end
 
       WARNING_MESSAGE = <<~MSG
