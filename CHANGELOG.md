@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-01-01
+
+### Fixed
+- **Rails 8.x+ middleware insertion**: Fixed automatic middleware insertion not working in Rails 8.x+ due to queued middleware operations not being visible via `include?` checks.
+
+### Changed
+- Railtie initializer now specifies `before: :build_middleware_stack` to ensure middleware insertion is queued before stack construction.
+- Middleware insertion now uses `app.config.middleware` instead of `app.middleware` for more reliable queuing in Rails 8.x+.
+- Extracted `middleware_not_found_error?` method to handle error detection across Rails versions (Rails 7's `MiddlewareNotFound` and Rails 8+'s `RuntimeError`).
+
+### Added
+- `@middleware_insertion_attempted` class variable to prevent duplicate middleware insertion when both railtie and generator initializer run.
+- `reset_middleware_insertion_flag!` method for testing purposes.
+- Support for alternative error message patterns (`"does not exist"`, `/middleware.*not found/i`) for future Rails version compatibility.
+- Comprehensive test coverage for:
+  - `include?` early return when middleware is already present
+  - Duplicate insertion prevention via flag
+  - Rails 7 `MiddlewareNotFound` exception handling
+  - Alternative error message patterns
+  - Unexpected exception re-raising
+
 ## [0.2.9] - 2025-12-31
 
 ### Added

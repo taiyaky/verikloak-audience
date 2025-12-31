@@ -23,8 +23,10 @@ unless defined?(Rails::Railtie)
         @initializers ||= []
       end
 
-      def self.initializer(name, &block)
-        entry = [name, block]
+      # Support both `initializer 'name' do ... end` and
+      # `initializer 'name', after: 'other' do ... end`
+      def self.initializer(name, options = {}, &block)
+        entry = [name, options, block]
         initializers << entry
         Rails::Railtie.initializers << entry unless equal?(Rails::Railtie)
       end
@@ -45,9 +47,15 @@ require 'verikloak/audience/railtie'
 
 RSpec.describe Verikloak::Audience::Railtie do
   let(:middleware_stack) { instance_double('MiddlewareStack') }
-  let(:app) { instance_double('RailsApp', middleware: middleware_stack) }
+  let(:config) { instance_double('Config', middleware: middleware_stack) }
+  let(:app) { instance_double('RailsApp', config: config, middleware: middleware_stack) }
   let(:configuration_initializer) do
     Rails::Railtie.initializers.find { |name, _| name == 'verikloak_audience.configuration' }
+  end
+
+  # Reset the insertion flag before each test to ensure clean state
+  before do
+    described_class.reset_middleware_insertion_flag!
   end
 
   it 'inserts after Verikloak::Middleware when defined' do
@@ -78,16 +86,107 @@ RSpec.describe Verikloak::Audience::Railtie do
     described_class.insert_middleware(app)
   end
 
+  it 'skips insertion when Audience middleware is already present (include? early return)' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      # Simulate middleware already present in stack
+      allow(middleware_stack).to receive(:respond_to?).with(:include?).and_return(true)
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(true)
+      expect(middleware_stack).not_to receive(:insert_after)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 'skips insertion when insertion has already been attempted (duplicate prevention flag)' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+
+      # First call should succeed
+      described_class.insert_middleware(app)
+      expect(middleware_stack).to have_received(:insert_after).once
+
+      # Second call should be skipped due to flag
+      described_class.insert_middleware(app)
+      expect(middleware_stack).to have_received(:insert_after).once
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
   it 'does nothing when Verikloak::Middleware is not in the stack' do
     begin
       module ::Verikloak; class Middleware; end; end
 
       allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
-      allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
+      # Simulate middleware not found by raising an error on insert_after
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+        .and_raise(RuntimeError.new('No such middleware'))
       expect(described_class).to receive(:warn_missing_core_middleware)
-      expect(middleware_stack).not_to receive(:insert_after)
 
       described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 'handles Rails 7 MiddlewareNotFound exception gracefully' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      # Create a custom exception class to simulate Rails 7's MiddlewareNotFound
+      middleware_not_found = Class.new(StandardError)
+      stub_const('ActionDispatch::MiddlewareStack::MiddlewareNotFound', middleware_not_found)
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+        .and_raise(ActionDispatch::MiddlewareStack::MiddlewareNotFound.new('Verikloak::Middleware'))
+      expect(described_class).to receive(:warn_missing_core_middleware)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 'handles alternative error messages for middleware not found' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+      # Test alternative error message pattern
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+        .and_raise(RuntimeError.new('middleware does not exist in the stack'))
+      expect(described_class).to receive(:warn_missing_core_middleware)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 're-raises unexpected exceptions' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+        .and_raise(ArgumentError.new('unexpected error'))
+
+      expect {
+        described_class.insert_middleware(app)
+      }.to raise_error(ArgumentError, 'unexpected error')
     ensure
       ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
     end
@@ -98,7 +197,10 @@ RSpec.describe Verikloak::Audience::Railtie do
       module ::Verikloak; class Middleware; end; end
 
       allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
-      allow(middleware_stack).to receive(:include?).with(::Verikloak::Middleware).and_return(false)
+      # Simulate middleware not found by raising an error on insert_after
+      allow(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+        .and_raise(RuntimeError.new('No such middleware'))
 
       logger = instance_double('Logger')
       if defined?(::Rails)
@@ -125,8 +227,9 @@ RSpec.describe Verikloak::Audience::Railtie do
     described_class.config.after_initialize_callbacks.clear
 
     railtie = described_class.new
+    # configuration_initializer is [name, options, block]
     expect {
-      railtie.instance_eval(&configuration_initializer[1])
+      railtie.instance_eval(&configuration_initializer[2])
     }.to change { described_class.config.after_initialize_callbacks.size }.by(1)
 
     callback = described_class.config.after_initialize_callbacks.last
@@ -150,7 +253,8 @@ RSpec.describe Verikloak::Audience::Railtie do
     ARGV.replace(['generate', 'verikloak:install'])
 
     railtie = described_class.new
-    railtie.instance_eval(&configuration_initializer[1])
+    # configuration_initializer is [name, options, block]
+    railtie.instance_eval(&configuration_initializer[2])
 
     callback = described_class.config.after_initialize_callbacks.last
     config_double = instance_double(Verikloak::Audience::Configuration)
@@ -174,7 +278,8 @@ RSpec.describe Verikloak::Audience::Railtie do
     ARGV.replace(['verikloak:install'])
 
     railtie = described_class.new
-    railtie.instance_eval(&configuration_initializer[1])
+    # configuration_initializer is [name, options, block]
+    railtie.instance_eval(&configuration_initializer[2])
 
     callback = described_class.config.after_initialize_callbacks.last
     config_double = instance_double(Verikloak::Audience::Configuration)
@@ -198,7 +303,8 @@ RSpec.describe Verikloak::Audience::Railtie do
     ARGV.replace(['verikloak:pundit:install'])
 
     railtie = described_class.new
-    railtie.instance_eval(&configuration_initializer[1])
+    # configuration_initializer is [name, options, block]
+    railtie.instance_eval(&configuration_initializer[2])
 
     callback = described_class.config.after_initialize_callbacks.last
     config_double = instance_double(Verikloak::Audience::Configuration)
@@ -222,7 +328,8 @@ RSpec.describe Verikloak::Audience::Railtie do
     ARGV.replace(['generate', 'verikloak:install'])
 
     railtie = described_class.new
-    railtie.instance_eval(&configuration_initializer[1])
+    # configuration_initializer is [name, options, block]
+    railtie.instance_eval(&configuration_initializer[2])
 
     callback = described_class.config.after_initialize_callbacks.last
     config_double = instance_double(Verikloak::Audience::Configuration)
