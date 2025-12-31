@@ -71,6 +71,103 @@ See [`examples/rack.ru`](examples/rack.ru) for a full Rack sample. In Rails, alw
 - When audience validation fails, the middleware consults `env['verikloak.logger']`, `env['rack.logger']`, and `env['action_dispatch.logger']` (in that order) before falling back to Ruby's `Kernel#warn`, keeping failure logs consistent with Rails and Verikloak observers.
 - For the `:resource_or_aud` profile, `resource_client` must match one of the values in `required_aud`. A single-element `required_aud` automatically infers the client id, ensuring the same client identifier is shared with downstream BFF/Pundit integrations.
 
+## Keycloak Integration
+
+### Default Audience Behavior
+
+Keycloak access tokens include `aud: "account"` by default. This is often unexpected for developers who expect the client ID to appear in the audience claim.
+
+| Token Type | Default `aud` Value |
+|------------|---------------------|
+| Access Token | `"account"` |
+| ID Token | Client ID |
+
+### Common Issue
+
+```ruby
+# Configuration
+config.verikloak.audience = 'rails-api'
+
+# Actual token payload
+{
+  "aud": "account",  # NOT "rails-api"!
+  "sub": "user-123",
+  ...
+}
+
+# Result: 403 Forbidden - audience validation fails
+```
+
+### Solution: Configure Audience Mapper in Keycloak
+
+To add a custom audience to access tokens:
+
+1. Go to **Clients** → Select your client (e.g., `rails-api`)
+2. Navigate to **Client scopes** tab
+3. Click on the dedicated scope (e.g., `rails-api-dedicated`)
+4. Go to **Mappers** tab → **Add mapper** → **By configuration**
+5. Select **Audience**
+6. Configure:
+   - **Name**: `rails-api-audience`
+   - **Included Client Audience**: `rails-api`
+   - **Add to access token**: ON
+7. Save
+
+After this configuration, tokens will include:
+```json
+{
+  "aud": ["rails-api", "account"],
+  ...
+}
+```
+
+### Configuration Examples
+
+#### Option 1: Allow both custom and account audience
+
+```ruby
+# config/initializers/verikloak.rb
+Rails.application.configure do
+  config.verikloak.audience = ['rails-api', 'account']
+end
+```
+
+#### Option 2: Use :allow_account profile
+
+```ruby
+# With verikloak-audience middleware
+use Verikloak::Audience::Middleware,
+  profile: :allow_account,
+  required_aud: ['rails-api']
+```
+
+#### Option 3: Strict single audience (requires Keycloak Mapper)
+
+```ruby
+# Only works if Keycloak Audience Mapper is configured
+use Verikloak::Audience::Middleware,
+  profile: :strict_single,
+  required_aud: ['rails-api']
+```
+
+### Troubleshooting
+
+#### "Audience validation failed" errors
+
+1. Check your token's `aud` claim:
+   ```bash
+   # Decode JWT (paste your token)
+   echo "YOUR_TOKEN" | cut -d. -f2 | base64 -d | jq .aud
+   ```
+
+2. If `aud` is only `"account"`:
+   - Add an Audience Mapper in Keycloak (see above)
+   - OR use `:allow_account` profile
+
+3. If using oauth2-proxy:
+   - Ensure the correct client ID is configured
+   - Check that the token is being forwarded correctly
+
 ## Testing
 All pull requests and pushes are automatically tested with [RSpec](https://rspec.info/) and [RuboCop](https://rubocop.org/) via GitHub Actions.
 See the CI badge at the top for current build status.

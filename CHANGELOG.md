@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.9] - 2025-12-31
+
+### Added
+- **Keycloak Integration** documentation section in README:
+  - Default audience behavior explanation (Access Token: `"account"`, ID Token: Client ID)
+  - Step-by-step guide for configuring Audience Mapper in Keycloak
+  - Configuration examples using `:allow_account` profile and array audiences
+  - Troubleshooting guide with JWT decoding commands
+
+### Documentation
+- Added guidance for common Keycloak + audience validation issues
+- Clarified the relationship between Keycloak client configuration and token `aud` claims
+
 ## [0.2.8] - 2025-09-28
 
 ### Changed
