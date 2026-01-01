@@ -266,10 +266,10 @@ module Verikloak
       end
 
       def self.skip_unconfigured_validation?
-        audiences_configured?
+        audiences_unconfigured?
       end
 
-      def self.audiences_configured?
+      def self.audiences_unconfigured?
         audiences = Verikloak::Audience.config.required_aud_list
 
         if audiences.empty?
