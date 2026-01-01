@@ -15,11 +15,12 @@ module Verikloak
     class Middleware
       # @param app [#call] next Rack application
       # @param opts [Hash] configuration overrides (see {Configuration})
-      # @option opts [Symbol] :profile
+      # @option opts [Symbol] :profile (:strict_single, :allow_account, :any_match, :resource_or_aud)
       # @option opts [Array<String>,String,Symbol] :required_aud
       # @option opts [String] :resource_client
       # @option opts [String] :env_claims_key
       # @option opts [Boolean] :suggest_in_logs
+      # @option opts [Array<String, Regexp>] :skip_paths
       def initialize(app, **opts)
         @app = app
         @config = Verikloak::Audience.config.dup
@@ -32,6 +33,9 @@ module Verikloak
       # @param env [Hash] Rack environment
       # @return [Array(Integer, Hash, #each)] Rack response triple
       def call(env)
+        # Skip audience validation for configured paths (e.g., health checks)
+        return @app.call(env) if skip_path?(env)
+
         env_key = @config.env_claims_key
         claims = env[env_key] || env[env_key&.to_sym] || {}
         return @app.call(env) if Checker.ok?(claims, @config)
@@ -50,6 +54,36 @@ module Verikloak
       end
 
       private
+
+      # Check if the current request path should skip audience validation.
+      #
+      # @param env [Hash] Rack environment
+      # @return [Boolean]
+      def skip_path?(env)
+        paths = @config.skip_paths
+        return false if paths.nil? || paths.empty?
+
+        request_path = env['PATH_INFO'] || env['REQUEST_PATH'] || ''
+        paths.any? { |pattern| path_matches?(request_path, pattern) }
+      end
+
+      # Determine if a request path matches the given pattern.
+      # Supports exact matches and prefix matches (pattern ending with *).
+      #
+      # @param request_path [String]
+      # @param pattern [String, Regexp]
+      # @return [Boolean]
+      def path_matches?(request_path, pattern)
+        return false if pattern.nil?
+        return request_path.match?(pattern) if pattern.is_a?(Regexp)
+        return false if pattern.empty?
+
+        if pattern.end_with?('*')
+          request_path.start_with?(pattern.chomp('*'))
+        else
+          request_path == pattern || request_path.start_with?("#{pattern}/")
+        end
+      end
 
       # Apply provided options to the configuration instance.
       #
@@ -70,14 +104,24 @@ module Verikloak
 
       # Determine whether configuration validation should run. This allows
       # Rails generators to boot without a fully-populated configuration since
-      # the install task is responsible for creating it.
+      # the install task is responsible for creating it. Also skips validation
+      # when configuration is not explicitly set up.
       #
       # @return [Boolean]
       def skip_validation?
-        return false unless defined?(::Verikloak::Audience::Railtie)
-        return false unless ::Verikloak::Audience::Railtie.respond_to?(:skip_configuration_validation?)
+        # Skip if Railtie indicates generator mode
+        if defined?(::Verikloak::Audience::Railtie)
+          if ::Verikloak::Audience::Railtie.respond_to?(:skip_configuration_validation?) && ::Verikloak::Audience::Railtie.skip_configuration_validation?
+            return true
+          end
 
-        ::Verikloak::Audience::Railtie.skip_configuration_validation?
+          # Skip if configuration is incomplete (no audiences configured)
+          if ::Verikloak::Audience::Railtie.respond_to?(:skip_unconfigured_validation?) && ::Verikloak::Audience::Railtie.skip_unconfigured_validation?
+            return true
+          end
+        end
+
+        false
       end
 
       # Emit a warning for failed audience checks using request-scoped loggers

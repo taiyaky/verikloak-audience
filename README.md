@@ -22,6 +22,7 @@ For the full error behaviour (response shapes, exception classes, logging hints)
 |---------|---------|-----------------------------------------------------------|
 | `:strict_single` *(recommended)* | Requires `aud` to match `required_aud` exactly (order-insensitive, no extras). | APIs where audiences are cleanly separated. Logged suggestion when the observed `aud` already equals the configured list. |
 | `:allow_account` | Allows `account` in addition to required audiences (e.g. `["rails-api","account"]`). | SPA + API mixes where Keycloak always emits `account`. Suggested when strict mode fails and the log shows `profile=:allow_account`. |
+| `:any_match` | Passes when at least one of the required audiences is present. | Shared APIs where multiple clients may have overlapping audiences. More permissive than `:strict_single`. |
 | `:resource_or_aud` | Passes when `resource_access[client].roles` is present; otherwise falls back to `:allow_account`. | Services relying on resource roles. Suggested when logs output `profile=:resource_or_aud`. |
 
 ## Installation
@@ -30,13 +31,14 @@ For the full error behaviour (response shapes, exception classes, logging hints)
 bundle add verikloak-audience
 ```
 
-In Rails applications, generate the initializer that automatically inserts the middleware:
+In Rails applications, run the generator to create a configuration initializer:
 
 ```bash
 rails g verikloak:audience:install
 ```
 
-This creates `config/initializers/verikloak_audience.rb` that will insert the audience middleware after the core Verikloak middleware once it's available.
+This creates `config/initializers/verikloak_audience.rb` with configuration options.
+The middleware is automatically inserted by the Railtie after `Verikloak::Middleware`.
 
 ## Manual Rack / Rails setup
 
@@ -58,7 +60,7 @@ See [`examples/rack.ru`](examples/rack.ru) for a full Rack sample. In Rails, alw
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `profile` | Symbol | `:strict_single` | Profile selector. Accepts `:strict_single`, `:allow_account`, or `:resource_or_aud`. |
+| `profile` | Symbol | `:strict_single` | Profile selector. Accepts `:strict_single`, `:allow_account`, `:any_match`, or `:resource_or_aud`. |
 | `required_aud` | Array/String/Symbol | `[]` | Required audience values; coerced to an array internally. |
 | `resource_client` | String | `"rails-api"` | Keycloak client id used to look up `resource_access[client].roles`. |
 | `env_claims_key` | String | `"verikloak.user"` | Rack env key where verified claims are stored. |

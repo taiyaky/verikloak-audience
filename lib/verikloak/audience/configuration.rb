@@ -8,7 +8,7 @@ module Verikloak
     #
     # @!attribute [rw] profile
     #   The enforcement profile to use.
-    #   @return [:strict_single, :allow_account, :resource_or_aud]
+    #   @return [:strict_single, :allow_account, :any_match, :resource_or_aud]
     # @!attribute [rw] required_aud
     #   Required audience(s). Can be a String/Symbol or an Array of them.
     #   @return [Array<String,Symbol>, String, Symbol]
@@ -21,12 +21,16 @@ module Verikloak
     # @!attribute [rw] suggest_in_logs
     #   Whether to log a suggestion when audience validation fails.
     #   @return [Boolean]
+    # @!attribute [rw] skip_paths
+    #   Paths to skip audience validation for (e.g., health checks).
+    #   Synced from verikloak-rails when available.
+    #   @return [Array<String, Regexp>]
     class Configuration
       DEFAULT_RESOURCE_CLIENT = 'rails-api'
       DEFAULT_ENV_CLAIMS_KEY = 'verikloak.user'
 
       attr_accessor :profile, :required_aud, :resource_client,
-                    :suggest_in_logs
+                    :suggest_in_logs, :skip_paths
       attr_reader :env_claims_key
 
       # Create a configuration with safe defaults.
@@ -38,6 +42,7 @@ module Verikloak
         @resource_client = DEFAULT_RESOURCE_CLIENT
         self.env_claims_key = DEFAULT_ENV_CLAIMS_KEY
         @suggest_in_logs = true
+        @skip_paths      = []
       end
 
       # Ensure `dup` produces an independent copy.
@@ -51,6 +56,7 @@ module Verikloak
         @resource_client = safe_dup(source.resource_client)
         self.env_claims_key = safe_dup(source.env_claims_key)
         @suggest_in_logs = source.suggest_in_logs
+        @skip_paths      = source.skip_paths&.dup || []
       end
 
       # Coerce `required_aud` into an array of strings.

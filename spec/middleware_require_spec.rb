@@ -55,6 +55,18 @@ RSpec.describe "Verikloak::Audience::Middleware standalone require" do
   it "middleware validates configuration when loaded standalone" do
     app = ->(_env) { [200, {}, ["ok"]] }
 
+    # Stub skip_unconfigured_validation? to return false so validation runs
+    railtie = Class.new do
+      def self.skip_configuration_validation?
+        false
+      end
+
+      def self.skip_unconfigured_validation?
+        false
+      end
+    end
+    stub_const("Verikloak::Audience::Railtie", railtie)
+
     expect {
       Verikloak::Audience::Middleware.new(app, required_aud: [])
     }.to raise_error(Verikloak::Audience::ConfigurationError, /required_aud must include at least one audience/)
