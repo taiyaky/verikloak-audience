@@ -1,11 +1,24 @@
 # frozen_string_literal: true
 
-# Insert the audience middleware after the core Verikloak middleware once it
-# has been loaded into the application.
+# Verikloak Audience Configuration
 #
-# The Railtie's insert_middleware method includes internal guards to prevent
-# duplicate insertion when both the railtie initializer and this generated
-# initializer are loaded. This is safe to call multiple times.
-if defined?(Rails) && Rails.respond_to?(:application)
-  Verikloak::Audience::Railtie.insert_middleware(Rails.application)
+# Configure the audience validation profile and settings.
+# This middleware provides stricter audience validation than core Verikloak.
+#
+# The middleware is automatically inserted after Verikloak::Middleware by the
+# Railtie. No manual middleware insertion is required.
+#
+Verikloak::Audience.configure do |config|
+  # Audience validation profile
+  # :strict_single   - Only exact single audience match (default, recommended)
+  # :allow_account   - Allow "account" alongside your API audience
+  # :any_match       - At least one required audience is present (more permissive)
+  # :resource_or_aud - Check resource_access roles first, fallback to :allow_account
+  # config.profile = :strict_single
+
+  # Required audience(s) - synced from verikloak-rails automatically
+  # config.required_aud = ['rails-api']
+
+  # Skip paths for audience validation (synced from verikloak-rails automatically)
+  # config.skip_paths = %w[/up /health]
 end

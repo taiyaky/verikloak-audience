@@ -25,6 +25,29 @@ RSpec.describe Verikloak::Audience::Checker do
     expect(described_class.ok?(claims, cfg)).to be true
   end
 
+  it "any_match passes when at least one required audience is present" do
+    cfg.profile = :any_match
+    cfg.required_aud = ["rails-api", "other-api"]
+
+    # One match is sufficient
+    expect(described_class.ok?({ "aud" => ["rails-api"] }, cfg)).to be true
+    expect(described_class.ok?({ "aud" => ["other-api"] }, cfg)).to be true
+    expect(described_class.ok?({ "aud" => ["rails-api", "other-api"] }, cfg)).to be true
+
+    # Extra audiences are allowed
+    expect(described_class.ok?({ "aud" => ["rails-api", "account", "extra"] }, cfg)).to be true
+
+    # No match fails
+    expect(described_class.ok?({ "aud" => ["unrelated"] }, cfg)).to be false
+    expect(described_class.ok?({ "aud" => [] }, cfg)).to be false
+  end
+
+  it "any_match returns false when required_aud is empty" do
+    cfg.profile = :any_match
+    cfg.required_aud = []
+    expect(described_class.ok?({ "aud" => ["anything"] }, cfg)).to be false
+  end
+
   it "strict_single returns false when required_aud is empty" do
     cfg.profile = :strict_single
     cfg.required_aud = []

@@ -212,7 +212,7 @@ RSpec.describe Verikloak::Audience::Railtie do
         Rails.logger = logger
       end
 
-      expect(logger).to receive(:warn).with(described_class::WARNING_MESSAGE)
+      expect(logger).to receive(:warn).with(Verikloak::Audience::RailtieWarnings::WARNING_MESSAGE)
 
       described_class.insert_middleware(app)
     ensure
@@ -234,6 +234,7 @@ RSpec.describe Verikloak::Audience::Railtie do
 
     callback = described_class.config.after_initialize_callbacks.last
     config_double = instance_double(Verikloak::Audience::Configuration)
+    allow(config_double).to receive(:required_aud_list).and_return(['rails-api'])
     allow(Verikloak::Audience).to receive(:config).and_return(config_double)
     expect(config_double).to receive(:validate!).and_return(config_double)
 
@@ -374,6 +375,47 @@ RSpec.describe Verikloak::Audience::Railtie do
     config = Verikloak::Audience.config
     expect(config.required_aud_list).to eq(['custom-app'])
     expect(config.resource_client).to eq('custom-app')
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'syncs skip_paths from verikloak-rails configuration' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience, :skip_paths).new(nil, ['rails-api'], ['/up', '/health', '/rails/health'])
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    config = Verikloak::Audience.config
+    expect(config.skip_paths).to eq(['/up', '/health', '/rails/health'])
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'does not override existing skip_paths configuration' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    # Pre-configure skip_paths
+    Verikloak::Audience.configure do |cfg|
+      cfg.skip_paths = ['/custom/path']
+    end
+
+    rails_config = Struct.new(:user_env_key, :audience, :skip_paths).new(nil, ['rails-api'], ['/up', '/health'])
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    config = Verikloak::Audience.config
+    expect(config.skip_paths).to eq(['/custom/path'])
   ensure
     Verikloak::Audience.instance_variable_set(:@config, original_config)
   end

@@ -65,10 +65,19 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
         expect(File).to exist(path)
         
         initializer_content = File.read(path)
-        expect(initializer_content).to include('Verikloak::Audience::Railtie')
-        expect(initializer_content).to include('Verikloak::Audience::Railtie.insert_middleware')
-        expect(initializer_content).to include('Rails.application')
         expect(initializer_content).to include('frozen_string_literal: true')
+        # Configuration block
+        expect(initializer_content).to include('Verikloak::Audience.configure do |config|')
+        expect(initializer_content).to include('config.profile')
+        expect(initializer_content).to include(':strict_single')
+        expect(initializer_content).to include(':allow_account')
+        expect(initializer_content).to include(':any_match')
+        # Railtie auto-insertion note
+        expect(initializer_content).to include('automatically inserted')
+        expect(initializer_content).to include('Railtie')
+        # Should NOT include manual middleware insertion
+        expect(initializer_content).not_to include('insert_middleware')
+        expect(initializer_content).not_to include('Rails.application)')
       end
     end
   end
@@ -81,9 +90,12 @@ RSpec.describe 'Verikloak::Audience::Generators::InstallGenerator' do
 
         initializer_content = File.read('config/initializers/verikloak_audience.rb')
 
-        expect(initializer_content).to include('defined?(Rails)')
-        expect(initializer_content).to include('Rails.respond_to?(:application)')
         expect(initializer_content).to include('frozen_string_literal: true')
+        # Configuration documentation
+        expect(initializer_content).to include('config.required_aud')
+        expect(initializer_content).to include('config.skip_paths')
+        # No manual middleware insertion required
+        expect(initializer_content).not_to include('defined?(Rails)')
       end
     end
   end

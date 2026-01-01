@@ -10,6 +10,12 @@ RSpec.describe Verikloak::Audience::Middleware do
       cfg.required_aud = []
       cfg.profile = :strict_single
       cfg.resource_client = Verikloak::Audience::Configuration::DEFAULT_RESOURCE_CLIENT
+      cfg.skip_paths = []
+    end
+
+    # Reset the unconfigured warning flag to prevent interference between tests
+    if defined?(Verikloak::Audience::Railtie) && Verikloak::Audience::Railtie.respond_to?(:unconfigured_warning_emitted=)
+      Verikloak::Audience::Railtie.unconfigured_warning_emitted = false
     end
   end
 
@@ -52,7 +58,7 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect(logger).to receive(:warn).with(/insufficient_audience/)
     expect {
       Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["account"] }, "rack.logger" => logger })
-    }.not_to output.to_stderr
+    }.not_to output(/insufficient_audience/).to_stderr
   end
 
   it "accepts via resource_or_aud when roles exist" do
@@ -66,7 +72,7 @@ RSpec.describe Verikloak::Audience::Middleware do
     app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", suggest_in_logs: false)
     expect {
       Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["rails-api", "account"] } })
-    }.not_to output.to_stderr
+    }.not_to output(/insufficient_audience/).to_stderr
   end
 
   it "isolates middleware overrides from global configuration" do
@@ -107,6 +113,18 @@ RSpec.describe Verikloak::Audience::Middleware do
   end
 
   it "raises when required_aud is missing" do
+    # Stub skip_unconfigured_validation? to return false so validation runs
+    railtie = Class.new do
+      def self.skip_configuration_validation?
+        false
+      end
+
+      def self.skip_unconfigured_validation?
+        false
+      end
+    end
+    stub_const("Verikloak::Audience::Railtie", railtie)
+
     expect {
       described_class.new(inner_app)
     }.to raise_error(Verikloak::Audience::ConfigurationError, /required_aud/)
@@ -124,5 +142,71 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect {
       described_class.new(inner_app)
     }.not_to raise_error
+  end
+
+  describe "skip_paths" do
+    it "skips audience validation for exact path matches" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/up", "/health"])
+      # No claims provided, but path is skipped
+      res = Rack::MockRequest.new(app).get("/up", {})
+      expect(res.status).to eq 200
+    end
+
+    it "skips audience validation for path prefix matches" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/rails/health"])
+      res = Rack::MockRequest.new(app).get("/rails/health/check", {})
+      expect(res.status).to eq 200
+    end
+
+    it "skips audience validation for wildcard patterns" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/api/public/*"])
+      res = Rack::MockRequest.new(app).get("/api/public/docs", {})
+      expect(res.status).to eq 200
+    end
+
+    it "does not skip for non-matching paths" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/up"])
+      res = Rack::MockRequest.new(app).get("/api/users", {})
+      expect(res.status).to eq 403
+    end
+
+    it "validates audience for non-skipped paths" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/up"])
+      res = Rack::MockRequest.new(app).get("/api/users", { "claims" => { "aud" => ["rails-api"] } })
+      expect(res.status).to eq 200
+    end
+
+    it "handles empty skip_paths gracefully" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: [])
+      res = Rack::MockRequest.new(app).get("/up", {})
+      expect(res.status).to eq 403
+    end
+
+    it "handles nil skip_paths gracefully" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: nil)
+      res = Rack::MockRequest.new(app).get("/up", {})
+      expect(res.status).to eq 403
+    end
+
+    it "skips audience validation for Regexp pattern matches" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: [/\A\/api\/v\d+\/public/])
+      res = Rack::MockRequest.new(app).get("/api/v1/public/docs", {})
+      expect(res.status).to eq 200
+
+      res = Rack::MockRequest.new(app).get("/api/v2/public/info", {})
+      expect(res.status).to eq 200
+
+      res = Rack::MockRequest.new(app).get("/api/v1/private/data", {})
+      expect(res.status).to eq 403
+    end
+
+    it "handles mixed String and Regexp patterns in skip_paths" do
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/up", /\A\/health/])
+      res = Rack::MockRequest.new(app).get("/up", {})
+      expect(res.status).to eq 200
+
+      res = Rack::MockRequest.new(app).get("/health/live", {})
+      expect(res.status).to eq 200
+    end
   end
 end

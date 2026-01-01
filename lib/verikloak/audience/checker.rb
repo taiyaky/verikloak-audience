@@ -7,7 +7,7 @@ module Verikloak
     # This module provides predicate helpers used by the middleware to decide
     # whether a given set of claims satisfies the configured profile.
     module Checker
-      VALID_PROFILES = %i[strict_single allow_account resource_or_aud].freeze
+      VALID_PROFILES = %i[strict_single allow_account any_match resource_or_aud].freeze
 
       module_function
 
@@ -33,6 +33,8 @@ module Verikloak
           strict_single?(claims, cfg.required_aud_list)
         when :allow_account
           allow_account?(claims, cfg.required_aud_list)
+        when :any_match
+          any_match?(claims, cfg.required_aud_list)
         when :resource_or_aud
           resource_or_aud?(claims, cfg.resource_client.to_s, cfg.required_aud_list)
         end
@@ -66,6 +68,20 @@ module Verikloak
         extras.empty? && (required - aud).empty?
       end
 
+      # Validate that at least one required audience is present in the token.
+      # More permissive than :strict_single; useful when multiple clients share audiences.
+      #
+      # @param claims [Hash]
+      # @param required [Array<String>]
+      # @return [Boolean]
+      def any_match?(claims, required)
+        aud = normalized_audiences(claims)
+        return false if required.empty?
+
+        # At least one of the required audiences must be present
+        aud.intersect?(required.map(&:to_s))
+      end
+
       # Permit when resource roles exist for the client; otherwise fallback to
       # {#allow_account?}.
       #
@@ -92,6 +108,7 @@ module Verikloak
         required = cfg.required_aud_list
         return :strict_single if strict_single?(claims, required)
         return :allow_account if allow_account?(claims, required)
+        return :any_match if any_match?(claims, required)
         return :resource_or_aud if resource_or_aud?(claims, cfg.resource_client.to_s, required)
 
         :strict_single

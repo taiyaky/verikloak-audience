@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-01-01
+
+### Added
+- **`:any_match` profile**: New audience validation profile that passes when at least one of the required audiences is present in the token.
+- **`skip_paths` configuration**: Skip audience validation for specific paths (e.g., health checks). Supports exact matches, prefix matches, wildcard patterns, and Regexp.
+- **Generator improvements**: Install generator now includes `Verikloak::Audience.configure` block with all four profiles documented.
+
+### Fixed
+- **Regexp support in `skip_paths`**: Fixed `NoMethodError` when passing Regexp patterns.
+- **Warning message accuracy**: Unconfigured warning now correctly states "ALL requests will be rejected with 403".
+- Configuration sync now happens before middleware insertion.
+
+### Changed
+- README now correctly describes that the Railtie automatically inserts the middleware.
+- Removed manual `insert_middleware` call from generated initializer (Railtie handles this automatically).
+
 ## [0.3.0] - 2026-01-01
 
 ### Fixed
