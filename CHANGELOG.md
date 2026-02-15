@@ -9,16 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-02-15
 
+### Added
+- **`Audience.reset!`**: New `reset!` class method for test teardown to prevent configuration leakage between examples
+
 ### Changed
 - Error responses now delegate to `Verikloak::ErrorResponse.build` for RFC 6750-compliant JSON output with `WWW-Authenticate` header
 - Skip-path matching now uses shared `Verikloak::SkipPathMatcher` from core gem (removes duplicated logic)
 - Error class hierarchy unified: `Verikloak::Audience::Error` now inherits from `Verikloak::Error`
 - **BREAKING**: Minimum `verikloak` dependency raised to `>= 0.4.1, < 1.0.0`
+- **BREAKING**: `skip_paths` prefix matching now requires explicit `/*` suffix (e.g. `'/rails/health/*'` instead of `'/rails/health'`). Exact path strings without `/*` are treated as exact matches only. Regexp patterns are unaffected.
 - Dev dependency `rspec` pinned to `~> 3.13`, `rubocop-rspec` pinned to `~> 3.9`
 
 ### Fixed
 - **`normalize_claims` observability**: `rescue StandardError` now captures the exception and emits a `warn` when `$DEBUG` is enabled, improving debuggability of malformed claims
-- **`Audience.reset!` added**: New `reset!` class method for test teardown to prevent configuration leakage between examples
 
 ---
 

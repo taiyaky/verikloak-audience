@@ -5,6 +5,7 @@ require 'verikloak/audience'
 require 'verikloak/audience/configuration'
 require 'verikloak/audience/checker'
 require 'verikloak/audience/errors'
+require 'verikloak/error_response'
 require 'verikloak/skip_path_matcher'
 
 module Verikloak
@@ -52,7 +53,6 @@ module Verikloak
                       "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
         end
 
-        require 'verikloak/error_response'
         Verikloak::ErrorResponse.build(
           code: 'insufficient_audience',
           message: "Audience not acceptable for profile #{@config.profile}",

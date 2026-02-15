@@ -101,4 +101,38 @@ RSpec.describe Verikloak::Audience::Checker do
   it "treats non-hash claims as empty when suggesting" do
     expect(described_class.suggest("invalid", cfg)).to eq(:strict_single)
   end
+
+  describe "normalize_claims observability" do
+    let(:poisoned) do
+      obj = Object.new
+      def obj.to_hash
+        raise TypeError, "coercion bomb"
+      end
+      obj
+    end
+
+    it "emits a warn when $DEBUG is enabled and normalize_claims fails" do
+      original = $DEBUG
+      begin
+        $DEBUG = true
+        expect {
+          described_class.ok?(poisoned, cfg)
+        }.to output(/normalize_claims failed.*TypeError.*coercion bomb/).to_stderr
+      ensure
+        $DEBUG = original
+      end
+    end
+
+    it "does not emit a warn when $DEBUG is disabled" do
+      original = $DEBUG
+      begin
+        $DEBUG = false
+        expect {
+          described_class.ok?(poisoned, cfg)
+        }.not_to output.to_stderr
+      ensure
+        $DEBUG = original
+      end
+    end
+  end
 end

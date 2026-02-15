@@ -8,12 +8,9 @@ module Verikloak
     # Inherits from {Verikloak::Error} so that `rescue Verikloak::Error` catches all
     # Verikloak gem errors uniformly.
     #
-    # @!attribute [r] code
-    #   Machine-friendly error code (e.g. "insufficient_audience").
-    #   @return [String]
-    # @!attribute [r] http_status
-    #   HTTP status code associated with the error.
-    #   @return [Integer]
+    # Inherits `code` and `http_status` accessors from {Verikloak::Error}.
+    # The parent class defines `attr_reader :code, :http_status` and accepts
+    # `code:` / `http_status:` keyword arguments in its initializer.
     class Error < Verikloak::Error
       # @param msg [String] human-readable error message
       # @param code [String] machine-friendly error code
