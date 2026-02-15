@@ -90,8 +90,8 @@ module Verikloak
       # @param required [Array<String>]
       # @return [Boolean]
       def resource_or_aud?(claims, client, required)
-        roles = Array(claims.dig('resource_access', client, 'roles'))
-        return true unless roles.empty? # if roles for client exist, pass
+        roles = Array(claims.dig('resource_access', client, 'roles')).compact.reject { |r| r.to_s.empty? }
+        return true unless roles.empty? # if meaningful roles for client exist, pass
 
         # otherwise enforce allow_account semantics by default
         allow_account?(claims, required)

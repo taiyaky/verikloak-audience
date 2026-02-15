@@ -67,9 +67,16 @@ module Verikloak
       end
 
       # @param value [#to_s, nil]
+      # @raise [ConfigurationError] when value is nil or blank
       # @return [void]
       def env_claims_key=(value)
-        @env_claims_key = value&.to_s
+        str = value&.to_s
+        if str.nil? || str.strip.empty?
+          raise Verikloak::Audience::ConfigurationError,
+                'env_claims_key must not be nil or empty'
+        end
+
+        @env_claims_key = str
       end
 
       # Validate the configuration to ensure required values are present.

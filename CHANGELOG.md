@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-02-15
+
+### Fixed
+- **`resource_or_aud?` null/empty role handling**: `roles: [nil]` or `roles: [""]` no longer pass validation — roles are now compacted and empty-string-filtered before the presence check
+- **ERRORS.md**: Added missing `:any_match` profile to the supported profiles list
+- **`env_claims_key` nil validation**: Setting `env_claims_key` to `nil` or empty string now raises `ConfigurationError` immediately instead of silently causing all audience checks to fail with a confusing 403
+
+### Changed
+- **BREAKING**: Minimum `verikloak` dependency raised to `~> 1.0`
+- **v1.0.0 stable release**: Public API is now considered stable under Semantic Versioning
+
+---
+
 ## [0.4.0] - 2026-02-15
 
 ### Added

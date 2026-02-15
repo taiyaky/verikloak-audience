@@ -24,7 +24,7 @@ Content-Type: application/json
 
 ### Trigger details
 - Claims are read from `env[config.env_claims_key]` (default: `"verikloak.user"`). Missing claims are treated as `{}`.
-- Validation is delegated to `Verikloak::Audience::Checker.ok?`, which supports profiles `:strict_single`, `:allow_account`, and `:resource_or_aud`.
+- Validation is delegated to `Verikloak::Audience::Checker.ok?`, which supports profiles `:strict_single`, `:allow_account`, `:any_match`, and `:resource_or_aud`.
 - When validation fails and `config.suggest_in_logs` is true (default), the middleware emits a `warn` message to STDERR such as:
   ```
   [verikloak-audience] insufficient_audience; suggestion profile=:allow_account aud=["my-api","account"]
