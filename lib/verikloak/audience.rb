@@ -34,6 +34,14 @@ module Verikloak
       def config
         @config ||= Configuration.new
       end
+
+      # Reset configuration to defaults.
+      # Intended for test teardown to prevent leakage between examples.
+      #
+      # @return [void]
+      def reset!
+        @config = nil
+      end
     end
   end
 end

@@ -5,6 +5,8 @@ require 'verikloak/audience'
 require 'verikloak/audience/configuration'
 require 'verikloak/audience/checker'
 require 'verikloak/audience/errors'
+require 'verikloak/error_response'
+require 'verikloak/skip_path_matcher'
 
 module Verikloak
   module Audience
@@ -13,6 +15,8 @@ module Verikloak
     # Place this middleware after the core {::Verikloak::Middleware} so that
     # verified token claims are already available in the Rack env.
     class Middleware
+      include Verikloak::SkipPathMatcher
+
       # @param app [#call] next Rack application
       # @param opts [Hash] configuration overrides (see {Configuration})
       # @option opts [Symbol] :profile (:strict_single, :allow_account, :any_match, :resource_or_aud)
@@ -26,6 +30,7 @@ module Verikloak
         @config = Verikloak::Audience.config.dup
         apply_overrides!(opts)
         @config.validate! unless skip_validation?
+        compile_skip_paths(@config.skip_paths || [])
       end
 
       # Evaluate the request against the audience profile.
@@ -34,7 +39,8 @@ module Verikloak
       # @return [Array(Integer, Hash, #each)] Rack response triple
       def call(env)
         # Skip audience validation for configured paths (e.g., health checks)
-        return @app.call(env) if skip_path?(env)
+        path = env['PATH_INFO'] || env['REQUEST_PATH'] || ''
+        return @app.call(env) if skip?(path)
 
         env_key = @config.env_claims_key
         claims = env[env_key] || env[env_key&.to_sym] || {}
@@ -47,43 +53,14 @@ module Verikloak
                       "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
         end
 
-        body = { error: 'insufficient_audience',
-                 message: "Audience not acceptable for profile #{@config.profile}" }.to_json
-        headers = { 'Content-Type' => 'application/json' }
-        [403, headers, [body]]
+        Verikloak::ErrorResponse.build(
+          code: 'insufficient_audience',
+          message: "Audience not acceptable for profile #{@config.profile}",
+          status: 403
+        )
       end
 
       private
-
-      # Check if the current request path should skip audience validation.
-      #
-      # @param env [Hash] Rack environment
-      # @return [Boolean]
-      def skip_path?(env)
-        paths = @config.skip_paths
-        return false if paths.nil? || paths.empty?
-
-        request_path = env['PATH_INFO'] || env['REQUEST_PATH'] || ''
-        paths.any? { |pattern| path_matches?(request_path, pattern) }
-      end
-
-      # Determine if a request path matches the given pattern.
-      # Supports exact matches and prefix matches (pattern ending with *).
-      #
-      # @param request_path [String]
-      # @param pattern [String, Regexp]
-      # @return [Boolean]
-      def path_matches?(request_path, pattern)
-        return false if pattern.nil?
-        return request_path.match?(pattern) if pattern.is_a?(Regexp)
-        return false if pattern.empty?
-
-        if pattern.end_with?('*')
-          request_path.start_with?(pattern.chomp('*'))
-        else
-          request_path == pattern || request_path.start_with?("#{pattern}/")
-        end
-      end
 
       # Apply provided options to the configuration instance.
       #
