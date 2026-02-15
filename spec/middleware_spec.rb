@@ -153,7 +153,7 @@ RSpec.describe Verikloak::Audience::Middleware do
     end
 
     it "skips audience validation for path prefix matches" do
-      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/rails/health"])
+      app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", skip_paths: ["/rails/health/*"])
       res = Rack::MockRequest.new(app).get("/rails/health/check", {})
       expect(res.status).to eq 200
     end

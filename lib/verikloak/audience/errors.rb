@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require 'verikloak/errors'
+
 module Verikloak
   module Audience
     # Base error for audience failures.
+    # Inherits from {Verikloak::Error} so that `rescue Verikloak::Error` catches all
+    # Verikloak gem errors uniformly.
     #
     # @!attribute [r] code
     #   Machine-friendly error code (e.g. "insufficient_audience").
@@ -10,16 +14,12 @@ module Verikloak
     # @!attribute [r] http_status
     #   HTTP status code associated with the error.
     #   @return [Integer]
-    class Error < StandardError
-      attr_reader :code, :http_status
-
+    class Error < Verikloak::Error
       # @param msg [String] human-readable error message
       # @param code [String] machine-friendly error code
       # @param http_status [Integer] associated HTTP status
       def initialize(msg = 'audience error', code: 'audience_error', http_status: 403)
-        super(msg)
-        @code = code
-        @http_status = http_status
+        super
       end
     end
 

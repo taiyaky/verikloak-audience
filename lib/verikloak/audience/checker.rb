@@ -129,7 +129,8 @@ module Verikloak
         end
 
         {}
-      rescue StandardError
+      rescue StandardError => e
+        warn "[Verikloak::Audience] normalize_claims failed: #{e.class}: #{e.message}" if $DEBUG
         {}
       end
       module_function :normalize_claims
