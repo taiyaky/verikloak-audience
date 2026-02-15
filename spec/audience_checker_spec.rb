@@ -61,6 +61,36 @@ RSpec.describe Verikloak::Audience::Checker do
     expect(described_class.ok?(claims, cfg)).to be true
   end
 
+  it "resource_or_aud falls back to allow_account when roles contain only nil" do
+    cfg.profile = :resource_or_aud
+    cfg.required_aud = ["rails-api"]
+    claims = {
+      "resource_access" => { "rails-api" => { "roles" => [nil] } },
+      "aud" => ["rails-api", "account"]
+    }
+    expect(described_class.ok?(claims, cfg)).to be true
+  end
+
+  it "resource_or_aud falls back to allow_account when roles contain only empty strings" do
+    cfg.profile = :resource_or_aud
+    cfg.required_aud = ["rails-api"]
+    claims = {
+      "resource_access" => { "rails-api" => { "roles" => [""] } },
+      "aud" => ["rails-api", "account"]
+    }
+    expect(described_class.ok?(claims, cfg)).to be true
+  end
+
+  it "resource_or_aud rejects when roles are nil/empty and aud doesn't match" do
+    cfg.profile = :resource_or_aud
+    cfg.required_aud = ["rails-api"]
+    claims = {
+      "resource_access" => { "rails-api" => { "roles" => [nil, ""] } },
+      "aud" => ["other-client"]
+    }
+    expect(described_class.ok?(claims, cfg)).to be false
+  end
+
   it "strict_single matches multiple audiences order-insensitively" do
     cfg.profile = :strict_single
     cfg.required_aud = ["a", "b"]

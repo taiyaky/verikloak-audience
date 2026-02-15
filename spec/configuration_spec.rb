@@ -45,6 +45,34 @@ RSpec.describe Verikloak::Audience::Configuration do
     expect(cfg.env_claims_key).to eq("claims")
   end
 
+  it "strips whitespace from env_claims_key" do
+    cfg = described_class.new
+    cfg.env_claims_key = "  verikloak.user  "
+
+    expect(cfg.env_claims_key).to eq("verikloak.user")
+  end
+
+  it "raises ConfigurationError when env_claims_key is set to nil" do
+    cfg = described_class.new
+    expect { cfg.env_claims_key = nil }.to raise_error(
+      Verikloak::Audience::ConfigurationError, /must not be nil or empty/
+    )
+  end
+
+  it "raises ConfigurationError when env_claims_key is set to empty string" do
+    cfg = described_class.new
+    expect { cfg.env_claims_key = "" }.to raise_error(
+      Verikloak::Audience::ConfigurationError, /must not be nil or empty/
+    )
+  end
+
+  it "raises ConfigurationError when env_claims_key is whitespace only" do
+    cfg = described_class.new
+    expect { cfg.env_claims_key = "   " }.to raise_error(
+      Verikloak::Audience::ConfigurationError, /must not be nil or empty/
+    )
+  end
+
   describe "#validate!" do
     it "raises when required_aud is empty" do
       cfg = described_class.new
