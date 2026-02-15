@@ -71,12 +71,13 @@ module Verikloak
       # @return [void]
       def env_claims_key=(value)
         str = value&.to_s
-        if str.nil? || str.strip.empty?
+        stripped = str&.strip
+        if stripped.nil? || stripped.empty?
           raise Verikloak::Audience::ConfigurationError,
                 'env_claims_key must not be nil or empty'
         end
 
-        @env_claims_key = str
+        @env_claims_key = stripped
       end
 
       # Validate the configuration to ensure required values are present.
