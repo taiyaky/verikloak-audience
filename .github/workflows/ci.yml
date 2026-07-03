@@ -24,14 +24,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Cover every Ruby series supported by the gemspec (>= 3.1)
+        # Cover every Ruby series supported by the gemspec (>= 3.1).
+        # Tags are pinned to patch + Alpine versions so CI stays
+        # deterministic; bump them intentionally.
         include:
           - ruby: "3.1"
-            ruby_image: ruby:3.1-alpine
+            ruby_image: ruby:3.1.7-alpine3.21
           - ruby: "3.2"
-            ruby_image: ruby:3.2-alpine
+            ruby_image: ruby:3.2.11-alpine3.23
           - ruby: "3.3"
-            ruby_image: ruby:3.3-alpine
+            ruby_image: ruby:3.3.11-alpine3.23
           - ruby: "3.4"
             ruby_image: ruby:3.4.8-alpine3.23
 

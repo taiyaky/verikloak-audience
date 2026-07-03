@@ -71,10 +71,12 @@ module Verikloak
       end
 
       # Coerce `profile` into a Symbol, falling back to the default when unset.
-      # Note that the result is not guaranteed to be a member of
-      # {VALID_PROFILES}; use {#validated_profile} to enforce that.
+      # Values that cannot be symbolized (e.g. an Integer) are returned as-is
+      # so {#validated_profile} can reject them with a precise error. The
+      # result is not guaranteed to be a member of {VALID_PROFILES}; use
+      # {#validated_profile} to enforce that.
       #
-      # @return [Symbol]
+      # @return [Symbol, Object]
       def normalized_profile
         value = profile
         value = value.to_sym if value.respond_to?(:to_sym)

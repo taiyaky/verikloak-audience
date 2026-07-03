@@ -16,7 +16,9 @@ Gem::Specification.new do |spec|
   spec.homepage      = 'https://github.com/taiyaky/verikloak-audience'
   spec.license       = 'MIT'
 
-  spec.files         = Dir['lib/**/*.{rb,erb}'] + %w[README.md LICENSE CHANGELOG.md]
+  # ERRORS.md and MAINTAINERS.md are linked from the README, so ship them
+  # with the gem to keep those links working on rubydoc.info and offline.
+  spec.files         = Dir['lib/**/*.{rb,erb}'] + %w[README.md LICENSE CHANGELOG.md ERRORS.md MAINTAINERS.md]
   spec.require_paths = ['lib']
 
   spec.required_ruby_version = '>= 3.1'
