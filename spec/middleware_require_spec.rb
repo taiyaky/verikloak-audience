@@ -55,13 +55,9 @@ RSpec.describe "Verikloak::Audience::Middleware standalone require" do
   it "middleware validates configuration when loaded standalone" do
     app = ->(_env) { [200, {}, ["ok"]] }
 
-    # Stub skip_unconfigured_validation? to return false so validation runs
+    # Stub the Railtie to not skip so validation runs
     railtie = Class.new do
-      def self.skip_configuration_validation?
-        false
-      end
-
-      def self.skip_unconfigured_validation?
+      def self.skip_validation?(_config = nil)
         false
       end
     end

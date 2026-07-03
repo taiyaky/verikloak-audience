@@ -69,11 +69,7 @@ module Verikloak
       end
 
       def discovery_url_configured?(value)
-        return false unless value
-        return !value.blank? if value.respond_to?(:blank?)
-        return !value.empty? if value.respond_to?(:empty?)
-
-        true
+        !value_blank?(value)
       end
 
       def middleware_not_found_error?(error)
@@ -116,11 +112,16 @@ module Verikloak
       def sync_env_claims_key(cfg, rails_config)
         return unless rails_config.respond_to?(:user_env_key)
 
-        user_key = rails_config.user_env_key
-        return if blank?(user_key)
+        # Resolve the key the same way verikloak-rails' #effective_user_env_key
+        # does (>= 1.2): strip whitespace and treat blank as unset. The core
+        # middleware then falls back to its default env key, which matches our
+        # default, so both middlewares stay aligned on the same key.
+        user_key = rails_config.user_env_key.to_s.strip
+        return if user_key.empty?
 
-        current = cfg.env_claims_key
-        return unless current.nil? || current == Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY
+        # env_claims_key is never nil (its writer rejects nil), so only the
+        # untouched default is eligible for syncing.
+        return unless cfg.env_claims_key == Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY
 
         cfg.env_claims_key = user_key
       end
@@ -163,6 +164,7 @@ module Verikloak
 
       def value_blank?(value)
         return true if value.nil?
+        return value.blank? if value.respond_to?(:blank?)
         return true if value.respond_to?(:empty?) && value.empty?
 
         value.to_s.empty?
@@ -213,8 +215,7 @@ module Verikloak
 
       initializer 'verikloak_audience.configuration' do
         config.after_initialize do
-          next if Verikloak::Audience::Railtie.skip_configuration_validation?
-          next if Verikloak::Audience::Railtie.skip_unconfigured_validation?
+          next if Verikloak::Audience::Railtie.skip_validation?
 
           Verikloak::Audience.config.validate!
         end
@@ -256,6 +257,17 @@ module Verikloak
         self.middleware_insertion_attempted = false
       end
 
+      # Combined predicate used by the after-initialize hook and the
+      # middleware to decide whether configuration validation should run.
+      #
+      # @param config [Verikloak::Audience::Configuration] configuration whose
+      #   audiences decide the unconfigured-boot skip; the middleware passes
+      #   its own (post-override) configuration, the hook uses the global one
+      # @return [Boolean]
+      def self.skip_validation?(config = Verikloak::Audience.config)
+        skip_configuration_validation? || skip_unconfigured_validation?(config)
+      end
+
       def self.skip_configuration_validation?
         tokens = first_cli_tokens
         return false if tokens.empty?
@@ -265,12 +277,12 @@ module Verikloak
         tokens.any? { |token| verikloak_install_generator?(token) }
       end
 
-      def self.skip_unconfigured_validation?
-        audiences_unconfigured?
+      def self.skip_unconfigured_validation?(config = Verikloak::Audience.config)
+        audiences_unconfigured?(config)
       end
 
-      def self.audiences_unconfigured?
-        audiences = Verikloak::Audience.config.required_aud_list
+      def self.audiences_unconfigured?(config = Verikloak::Audience.config)
+        audiences = config.required_aud_list
 
         if audiences.empty?
           warn_unconfigured_once

@@ -129,7 +129,25 @@ RSpec.describe Verikloak::Audience::Checker do
   end
 
   it "treats non-hash claims as empty when suggesting" do
+    # Empty claims satisfy no profile: the default fallback preserves the
+    # 1.0 always-Symbol contract, and callers can opt into nil
     expect(described_class.suggest("invalid", cfg)).to eq(:strict_single)
+    expect(described_class.suggest("invalid", cfg, fallback: nil)).to be_nil
+  end
+
+  it "normalizes duck-typed claims when reporting observed audiences" do
+    duck = Class.new do
+      def to_hash = { "aud" => ["svc", :other] }
+    end.new
+
+    expect(described_class.observed_audiences(duck)).to eq(["svc", "other"])
+    expect(described_class.observed_audiences("garbage")).to eq([])
+  end
+
+  it "accepts symbol required audiences in public predicates" do
+    expect(described_class.strict_single?({ "aud" => ["svc"] }, [:svc])).to be true
+    expect(described_class.allow_account?({ "aud" => ["svc", "account"] }, [:svc])).to be true
+    expect(described_class.any_match?({ "aud" => ["svc"] }, :svc)).to be true
   end
 
   describe "normalize_claims observability" do

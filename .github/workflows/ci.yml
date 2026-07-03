@@ -14,12 +14,31 @@ on:
 
 jobs:
   rspec:
-    name: RSpec
+    name: RSpec (Ruby ${{ matrix.ruby }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       checks: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover every Ruby series supported by the gemspec (>= 3.1).
+        # Tags are pinned to patch + Alpine versions so CI stays
+        # deterministic; bump them intentionally.
+        include:
+          - ruby: "3.1"
+            ruby_image: ruby:3.1.7-alpine3.21
+          - ruby: "3.2"
+            ruby_image: ruby:3.2.11-alpine3.23
+          - ruby: "3.3"
+            ruby_image: ruby:3.3.11-alpine3.23
+          - ruby: "3.4"
+            ruby_image: ruby:3.4.8-alpine3.23
+
+    env:
+      RUBY_IMAGE: ${{ matrix.ruby_image }}
 
     steps:
       - name: Checkout source
@@ -45,7 +64,7 @@ jobs:
         uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
         if: always()
         with:
-          name: RSpec Reports
+          name: RSpec Reports (Ruby ${{ matrix.ruby }})
           path: tmp/rspec/results.xml
           reporter: java-junit
         continue-on-error: true
@@ -63,8 +82,28 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: rspec-coverage
+          name: rspec-coverage-ruby-${{ matrix.ruby }}
           path: artifacts/
+
+  # The main-branch ruleset requires a single status named "RSpec".
+  # This job aggregates the matrix legs so the required check keeps a
+  # stable name no matter how the matrix evolves.
+  rspec-summary:
+    name: RSpec
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: rspec
+    # Run even when a leg fails so the required check reports failure
+    # instead of being skipped (skipped checks would satisfy the ruleset).
+    if: always()
+
+    steps:
+      - name: Fail unless every RSpec matrix leg succeeded
+        env:
+          RSPEC_RESULT: ${{ needs.rspec.result }}
+        run: |
+          echo "RSpec matrix result: ${RSPEC_RESULT}"
+          [ "${RSPEC_RESULT}" = "success" ]
 
   rubocop:
     name: RuboCop

@@ -75,6 +75,45 @@ RSpec.describe Verikloak::Audience::Railtie do
     end
   end
 
+  it 'skips insertion and warns when verikloak-rails discovery_url is not configured' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      rails_config = Struct.new(:discovery_url).new(nil)
+      rails_module = Module.new do
+        define_singleton_method(:config) { rails_config }
+      end
+      stub_const('Verikloak::Rails', rails_module)
+
+      expect(described_class).to receive(:warn_core_not_configured)
+      expect(middleware_stack).not_to receive(:insert_after)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
+  it 'inserts middleware when verikloak-rails discovery_url is configured' do
+    begin
+      module ::Verikloak; class Middleware; end; end
+
+      rails_config = Struct.new(:discovery_url).new('https://keycloak.example.com/realms/app/.well-known/openid-configuration')
+      rails_module = Module.new do
+        define_singleton_method(:config) { rails_config }
+      end
+      stub_const('Verikloak::Rails', rails_module)
+
+      allow(middleware_stack).to receive(:include?).with(::Verikloak::Audience::Middleware).and_return(false)
+      expect(middleware_stack).to receive(:insert_after)
+        .with(::Verikloak::Middleware, ::Verikloak::Audience::Middleware)
+
+      described_class.insert_middleware(app)
+    ensure
+      ::Verikloak.send(:remove_const, :Middleware) if defined?(::Verikloak::Middleware)
+    end
+  end
+
   it 'does nothing when Verikloak::Middleware is not defined' do
     if defined?(::Verikloak::Middleware)
       ::Verikloak.send(:remove_const, :Middleware)
@@ -360,6 +399,44 @@ RSpec.describe Verikloak::Audience::Railtie do
     Verikloak::Audience.instance_variable_set(:@config, original_config)
   end
 
+  it 'treats a whitespace-only verikloak-rails user_env_key as unset, matching effective_user_env_key' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new('   ', nil)
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    # verikloak-rails resolves blank user_env_key to its default key for the
+    # core middleware, so keeping our identical default stays aligned with
+    # the env key the core middleware actually writes to.
+    described_class.apply_verikloak_rails_configuration
+
+    expect(Verikloak::Audience.config.env_claims_key)
+      .to eq(Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY)
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'strips padded verikloak-rails user_env_key values like effective_user_env_key does' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new('  verikloak.custom  ', nil)
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    expect(Verikloak::Audience.config.env_claims_key).to eq('verikloak.custom')
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
   it 'derives required_aud and resource_client from verikloak-rails defaults when missing' do
     original_config = Verikloak::Audience.instance_variable_get(:@config)
     Verikloak::Audience.instance_variable_set(:@config, nil)
@@ -418,5 +495,20 @@ RSpec.describe Verikloak::Audience::Railtie do
     expect(config.skip_paths).to eq(['/custom/path'])
   ensure
     Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'reports unconfigured audiences for the given configuration and warns only once' do
+    described_class.unconfigured_warning_emitted = false
+
+    empty_cfg = Verikloak::Audience::Configuration.new
+    configured_cfg = Verikloak::Audience::Configuration.new.tap { |c| c.required_aud = ['rails-api'] }
+
+    expect(described_class).to receive(:warn_unconfigured).once
+
+    expect(described_class.audiences_unconfigured?(empty_cfg)).to be true
+    expect(described_class.audiences_unconfigured?(empty_cfg)).to be true
+    expect(described_class.audiences_unconfigured?(configured_cfg)).to be false
+  ensure
+    described_class.unconfigured_warning_emitted = false
   end
 end
