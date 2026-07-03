@@ -129,7 +129,14 @@ RSpec.describe Verikloak::Audience::Checker do
   end
 
   it "treats non-hash claims as empty when suggesting" do
-    expect(described_class.suggest("invalid", cfg)).to eq(:strict_single)
+    # Empty claims satisfy no profile, so no suggestion is returned
+    expect(described_class.suggest("invalid", cfg)).to be_nil
+  end
+
+  it "accepts symbol required audiences in public predicates" do
+    expect(described_class.strict_single?({ "aud" => ["svc"] }, [:svc])).to be true
+    expect(described_class.allow_account?({ "aud" => ["svc", "account"] }, [:svc])).to be true
+    expect(described_class.any_match?({ "aud" => ["svc"] }, :svc)).to be true
   end
 
   describe "normalize_claims observability" do

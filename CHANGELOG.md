@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-07-03
+
+### Added
+- **Boot-time profile validation**: `Configuration#validate!` now rejects unknown `profile` values, so typos (e.g. `:strict_signle`) fail fast at startup instead of raising on the first request
+- **`Configuration#normalized_profile`**: Shared profile coercion helper (Symbol coercion + default fallback) used by both `validate!` and `Checker`
+- **JSON 500 for request-time configuration errors**: When a `ConfigurationError` surfaces during a request (normally prevented by boot-time validation), the middleware now renders a JSON error response (`audience_configuration_error`, status 500) instead of leaking the exception through the Rack stack
+- **CI Ruby matrix**: RSpec now runs against Ruby 3.1 / 3.2 / 3.3 / 3.4 (all series supported by the gemspec)
+- **Coverage floor**: SimpleCov now enforces a minimum line coverage of 90%
+- **MAINTAINERS.md**: Release instructions referenced from the README now exist
+- Tests for the `Forbidden`/`Error`/`ConfigurationError` classes, the Railtie `discovery_url` guard, the `REQUEST_PATH` fallback, and Symbol inputs to the public checker predicates
+
+### Changed
+- **`Checker.suggest` returns `nil` when no profile matches**: Previously it fell back to `:strict_single`, which produced misleading "suggestion" log lines; the middleware now logs `no profile matches the observed aud` in that case
+- `Checker::VALID_PROFILES` is now an alias of `Configuration::VALID_PROFILES` (same values; the canonical definition moved)
+- All public checker predicates (`strict_single?`, `allow_account?`, `any_match?`) now coerce `required` inputs consistently, accepting Symbols and single values
+- `Railtie.skip_validation?` combines the generator-mode and unconfigured checks; the middleware and the after-initialize hook now share it
+
+### Fixed
+- **CI coverage was never measured**: The `SIMPLECOV` environment variable set in GitHub Actions never reached the Docker container; `compose.yml` now passes it through, so coverage reports are actually generated in CI
+- Removed dead code paths (`env_key&.to_sym` safe navigation, unreachable `nil` check in `sync_env_claims_key`) and redundant `module_function` declarations in `Checker`
+
+---
+
 ## [1.0.0] - 2026-02-15
 
 ### Fixed

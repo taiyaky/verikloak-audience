@@ -42,16 +42,15 @@ module Verikloak
         path = env['PATH_INFO'] || env['REQUEST_PATH'] || ''
         return @app.call(env) if skip?(path)
 
-        env_key = @config.env_claims_key
-        claims = env[env_key] || env[env_key&.to_sym] || {}
-        return @app.call(env) if Checker.ok?(claims, @config)
-
-        if @config.suggest_in_logs
-          suggestion = Checker.suggest(claims, @config)
-          aud_view = Array(claims['aud']).inspect
-          log_warning(env,
-                      "[verikloak-audience] insufficient_audience; suggestion profile=:#{suggestion} aud=#{aud_view}")
+        claims = read_claims(env)
+        begin
+          authorized = Checker.ok?(claims, @config)
+        rescue Verikloak::Audience::ConfigurationError => e
+          return configuration_error_response(e)
         end
+        return @app.call(env) if authorized
+
+        log_rejection(env, claims)
 
         Verikloak::ErrorResponse.build(
           code: 'insufficient_audience',
@@ -61,6 +60,45 @@ module Verikloak
       end
 
       private
+
+      # Read verified claims from the Rack env under the configured key.
+      #
+      # @param env [Hash] Rack environment
+      # @return [Object] raw claims value (normalized later by {Checker})
+      def read_claims(env)
+        env_key = @config.env_claims_key
+        env[env_key] || env[env_key.to_sym] || {}
+      end
+
+      # Render a configuration failure as a JSON error response instead of
+      # leaking a raw exception through the Rack stack. Boot-time validation
+      # normally prevents this path; it guards deployments where validation
+      # was skipped (e.g. unconfigured Rails boot).
+      #
+      # @param error [Verikloak::Audience::ConfigurationError]
+      # @return [Array(Integer, Hash, #each)] Rack response triple
+      def configuration_error_response(error)
+        Verikloak::ErrorResponse.build(
+          code: error.code || 'audience_configuration_error',
+          message: error.message,
+          status: error.http_status || 500
+        )
+      end
+
+      # Emit the failure log (with a profile suggestion when one fits) if
+      # `suggest_in_logs` is enabled.
+      #
+      # @param env [Hash] Rack environment
+      # @param claims [Object] raw claims value read from the env
+      # @return [void]
+      def log_rejection(env, claims)
+        return unless @config.suggest_in_logs
+
+        suggestion = Checker.suggest(claims, @config)
+        detail = suggestion ? "suggestion profile=:#{suggestion}" : 'no profile matches the observed aud'
+        aud_view = Array(claims.is_a?(Hash) ? claims['aud'] : nil).inspect
+        log_warning(env, "[verikloak-audience] insufficient_audience; #{detail} aud=#{aud_view}")
+      end
 
       # Apply provided options to the configuration instance.
       #
@@ -86,19 +124,14 @@ module Verikloak
       #
       # @return [Boolean]
       def skip_validation?
-        # Skip if Railtie indicates generator mode
-        if defined?(::Verikloak::Audience::Railtie)
-          if ::Verikloak::Audience::Railtie.respond_to?(:skip_configuration_validation?) && ::Verikloak::Audience::Railtie.skip_configuration_validation?
-            return true
-          end
+        return false unless defined?(::Verikloak::Audience::Railtie)
 
-          # Skip if configuration is incomplete (no audiences configured)
-          if ::Verikloak::Audience::Railtie.respond_to?(:skip_unconfigured_validation?) && ::Verikloak::Audience::Railtie.skip_unconfigured_validation?
-            return true
-          end
-        end
+        railtie = ::Verikloak::Audience::Railtie
+        return railtie.skip_validation? if railtie.respond_to?(:skip_validation?)
 
-        false
+        # Fallback for partially-stubbed Railtie constants (e.g. in tests)
+        (railtie.respond_to?(:skip_configuration_validation?) && railtie.skip_configuration_validation?) ||
+          (railtie.respond_to?(:skip_unconfigured_validation?) && railtie.skip_unconfigured_validation?)
       end
 
       # Emit a warning for failed audience checks using request-scoped loggers

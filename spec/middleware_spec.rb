@@ -106,6 +106,38 @@ RSpec.describe Verikloak::Audience::Middleware do
     expect(response[0]).to eq(200)
   end
 
+  it "logs without a suggestion when no profile matches the observed aud" do
+    app = build_app(profile: :strict_single, required_aud: ["rails-api"], env_claims_key: "claims", suggest_in_logs: true)
+    expect {
+      Rack::MockRequest.new(app).get("/", { "claims" => { "aud" => ["unrelated"] } })
+    }.to output(/no profile matches the observed aud/).to_stderr
+  end
+
+  it "returns 500 JSON when an unknown profile slips past skipped validation" do
+    # Simulate a Rails boot where validation was skipped (e.g. generator mode)
+    railtie = Class.new do
+      def self.skip_validation?
+        true
+      end
+    end
+    stub_const("Verikloak::Audience::Railtie", railtie)
+
+    middleware = described_class.new(inner_app, profile: :bogus, required_aud: ["rails-api"], env_claims_key: "claims")
+    status, headers, body = middleware.call({ "claims" => { "aud" => ["rails-api"] } })
+
+    expect(status).to eq 500
+    expect(headers["Content-Type"]).to include "application/json"
+    expect(body.join).to include "audience_configuration_error"
+    expect(body.join).to include "unknown audience profile"
+  end
+
+  it "falls back to REQUEST_PATH when PATH_INFO is absent" do
+    middleware = described_class.new(inner_app, required_aud: ["rails-api"], skip_paths: ["/up"])
+    status, = middleware.call({ "REQUEST_PATH" => "/up" })
+
+    expect(status).to eq 200
+  end
+
   it "raises when unknown options are provided" do
     expect {
       described_class.new(inner_app, profile: :strict_single, foo: :bar)

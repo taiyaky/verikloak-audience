@@ -73,12 +73,43 @@ RSpec.describe Verikloak::Audience::Configuration do
     )
   end
 
+  describe "#normalized_profile" do
+    it "coerces string profiles to symbols" do
+      cfg = described_class.new
+      cfg.profile = "allow_account"
+      expect(cfg.normalized_profile).to eq(:allow_account)
+    end
+
+    it "falls back to the default when profile is nil" do
+      cfg = described_class.new
+      cfg.profile = nil
+      expect(cfg.normalized_profile).to eq(described_class::DEFAULT_PROFILE)
+    end
+  end
+
   describe "#validate!" do
     it "raises when required_aud is empty" do
       cfg = described_class.new
       cfg.required_aud = []
 
       expect { cfg.validate! }.to raise_error(Verikloak::Audience::ConfigurationError)
+    end
+
+    it "raises when profile is unknown" do
+      cfg = described_class.new
+      cfg.required_aud = ['rails-api']
+      cfg.profile = :strict_signle # typo on purpose
+
+      expect { cfg.validate! }.to raise_error(Verikloak::Audience::ConfigurationError,
+                                              /unknown audience profile/)
+    end
+
+    it "accepts string profiles that map to a known profile" do
+      cfg = described_class.new
+      cfg.required_aud = ['rails-api']
+      cfg.profile = "any_match"
+
+      expect { cfg.validate! }.not_to raise_error
     end
 
     it "infers resource_client from required_aud when profile resource_or_aud" do

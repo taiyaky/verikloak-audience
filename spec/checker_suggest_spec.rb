@@ -24,5 +24,16 @@ RSpec.describe Verikloak::Audience::Checker do
     claims = { "resource_access" => { "rails-api" => { "roles" => ["x"] } } }
     expect(described_class.suggest(claims, cfg)).to eq :resource_or_aud
   end
+
+  it "suggests :any_match when one of several required audiences is present" do
+    cfg.required_aud = ["rails-api", "other-api"]
+    claims = { "aud" => ["rails-api", "unrelated"] }
+    expect(described_class.suggest(claims, cfg)).to eq :any_match
+  end
+
+  it "returns nil when no profile accepts the claims" do
+    claims = { "aud" => ["unrelated"] }
+    expect(described_class.suggest(claims, cfg)).to be_nil
+  end
 end
 

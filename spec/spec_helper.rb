@@ -9,6 +9,8 @@ if ENV['SIMPLECOV']
     SimpleCov.start do
       enable_coverage :branch
       add_filter %r{^/spec/}
+      # Fail the suite when line coverage regresses below this floor
+      minimum_coverage line: 90
     end
   rescue LoadError
     warn '[spec_helper] simplecov not available; skipping coverage'

@@ -28,6 +28,10 @@ module Verikloak
     class Configuration
       DEFAULT_RESOURCE_CLIENT = 'rails-api'
       DEFAULT_ENV_CLAIMS_KEY = 'verikloak.user'
+      DEFAULT_PROFILE = :strict_single
+
+      # Enforcement profiles supported by {Verikloak::Audience::Checker}.
+      VALID_PROFILES = %i[strict_single allow_account any_match resource_or_aud].freeze
 
       attr_accessor :profile, :required_aud, :resource_client,
                     :suggest_in_logs, :skip_paths
@@ -37,7 +41,7 @@ module Verikloak
       #
       # @return [void]
       def initialize
-        @profile         = :strict_single
+        @profile         = DEFAULT_PROFILE
         @required_aud    = []
         @resource_client = DEFAULT_RESOURCE_CLIENT
         self.env_claims_key = DEFAULT_ENV_CLAIMS_KEY
@@ -66,6 +70,17 @@ module Verikloak
         Array(required_aud).map(&:to_s)
       end
 
+      # Coerce `profile` into a Symbol, falling back to the default when unset.
+      # Note that the result is not guaranteed to be a member of
+      # {VALID_PROFILES}; call {#validate!} to enforce that.
+      #
+      # @return [Symbol]
+      def normalized_profile
+        value = profile
+        value = value.to_sym if value.respond_to?(:to_sym)
+        value.nil? ? DEFAULT_PROFILE : value
+      end
+
       # @param value [#to_s, nil]
       # @raise [ConfigurationError] when value is nil or blank
       # @return [void]
@@ -82,6 +97,9 @@ module Verikloak
 
       # Validate the configuration to ensure required values are present.
       #
+      # @raise [ConfigurationError] when `required_aud` is empty, `profile` is
+      #   not one of {VALID_PROFILES}, or `resource_client` conflicts with
+      #   `required_aud` under the `:resource_or_aud` profile
       # @return [Configuration] the validated configuration
       def validate!
         audiences = required_aud_list
@@ -90,9 +108,11 @@ module Verikloak
                 'required_aud must include at least one audience'
         end
 
-        profile_name = profile
-        profile_name = profile_name.to_sym if profile_name.respond_to?(:to_sym)
-        profile_name ||= :strict_single
+        profile_name = normalized_profile
+        unless VALID_PROFILES.include?(profile_name)
+          raise Verikloak::Audience::ConfigurationError,
+                "unknown audience profile #{profile.inspect}"
+        end
 
         ensure_resource_client!(audiences) if profile_name == :resource_or_aud
 
