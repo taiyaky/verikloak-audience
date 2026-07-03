@@ -9,7 +9,9 @@ services:
         RUBY_IMAGE: ${RUBY_IMAGE:-ruby:3.4.8-alpine3.23}
     environment:
       # Passed through from the host so CI can enable coverage reporting
+      # and its minimum-coverage floor
       - SIMPLECOV
+      - CI
     volumes:
       - .:/app
     working_dir: /app

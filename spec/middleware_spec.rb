@@ -113,22 +113,36 @@ RSpec.describe Verikloak::Audience::Middleware do
     }.to output(/no profile matches the observed aud/).to_stderr
   end
 
-  it "returns 500 JSON when an unknown profile slips past skipped validation" do
+  it "returns generic 500 JSON and logs the detail when an unknown profile slips past skipped validation" do
     # Simulate a Rails boot where validation was skipped (e.g. generator mode)
     railtie = Class.new do
-      def self.skip_validation?
+      def self.skip_validation?(_config = nil)
         true
       end
     end
     stub_const("Verikloak::Audience::Railtie", railtie)
 
     middleware = described_class.new(inner_app, profile: :bogus, required_aud: ["rails-api"], env_claims_key: "claims")
-    status, headers, body = middleware.call({ "claims" => { "aud" => ["rails-api"] } })
+    status = headers = body = nil
+    expect {
+      status, headers, body = middleware.call({ "claims" => { "aud" => ["rails-api"] } })
+    }.to output(/configuration error: unknown audience profile :bogus/).to_stderr
 
     expect(status).to eq 500
     expect(headers["Content-Type"]).to include "application/json"
     expect(body.join).to include "audience_configuration_error"
-    expect(body.join).to include "unknown audience profile"
+    expect(body.join).to include "audience configuration error"
+    # The failure detail stays server-side; the body must not echo config values
+    expect(body.join).not_to include "bogus"
+  end
+
+  it "validates middleware options even when the global configuration is empty" do
+    # Global config has no audiences here (see the before block), but the
+    # middleware's own options are fully specified — its typo'd profile must
+    # fail at boot rather than surface per request.
+    expect {
+      described_class.new(inner_app, profile: :strict_signle, required_aud: ["rails-api"])
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /unknown audience profile/)
   end
 
   it "falls back to REQUEST_PATH when PATH_INFO is absent" do
@@ -145,13 +159,9 @@ RSpec.describe Verikloak::Audience::Middleware do
   end
 
   it "raises when required_aud is missing" do
-    # Stub skip_unconfigured_validation? to return false so validation runs
+    # Stub the Railtie to not skip so validation runs
     railtie = Class.new do
-      def self.skip_configuration_validation?
-        false
-      end
-
-      def self.skip_unconfigured_validation?
+      def self.skip_validation?(_config = nil)
         false
       end
     end
@@ -162,9 +172,9 @@ RSpec.describe Verikloak::Audience::Middleware do
     }.to raise_error(Verikloak::Audience::ConfigurationError, /required_aud/)
   end
 
-  it "skips validation when Railtie indicates generator command" do
+  it "skips validation when the Railtie says so (e.g. generator command)" do
     railtie = Class.new do
-      def self.skip_configuration_validation?
+      def self.skip_validation?(_config = nil)
         true
       end
     end

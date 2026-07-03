@@ -113,7 +113,11 @@ module Verikloak
         return unless rails_config.respond_to?(:user_env_key)
 
         user_key = rails_config.user_env_key
-        return if blank?(user_key)
+        # Skip only when verikloak-rails leaves the key unset. Present-but-blank
+        # values (e.g. an ENV var set to whitespace) flow through so the
+        # writer's validation rejects them loudly at boot instead of silently
+        # falling back to the default key.
+        return if user_key.nil? || user_key.to_s.empty?
 
         # env_claims_key is never nil (its writer rejects nil), so only the
         # untouched default is eligible for syncing.
@@ -256,9 +260,12 @@ module Verikloak
       # Combined predicate used by the after-initialize hook and the
       # middleware to decide whether configuration validation should run.
       #
+      # @param config [Verikloak::Audience::Configuration] configuration whose
+      #   audiences decide the unconfigured-boot skip; the middleware passes
+      #   its own (post-override) configuration, the hook uses the global one
       # @return [Boolean]
-      def self.skip_validation?
-        skip_configuration_validation? || skip_unconfigured_validation?
+      def self.skip_validation?(config = Verikloak::Audience.config)
+        skip_configuration_validation? || skip_unconfigured_validation?(config)
       end
 
       def self.skip_configuration_validation?
@@ -270,12 +277,12 @@ module Verikloak
         tokens.any? { |token| verikloak_install_generator?(token) }
       end
 
-      def self.skip_unconfigured_validation?
-        audiences_unconfigured?
+      def self.skip_unconfigured_validation?(config = Verikloak::Audience.config)
+        audiences_unconfigured?(config)
       end
 
-      def self.audiences_unconfigured?
-        audiences = Verikloak::Audience.config.required_aud_list
+      def self.audiences_unconfigured?(config = Verikloak::Audience.config)
+        audiences = config.required_aud_list
 
         if audiences.empty?
           warn_unconfigured_once

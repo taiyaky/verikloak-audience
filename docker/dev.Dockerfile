@@ -31,9 +31,12 @@ COPY Gemfile Gemfile.lock ./
 # Faster, more reliable bundler installs
 ARG BUNDLE_FROZEN=1
 ENV BUNDLE_JOBS=4 BUNDLE_RETRY=3 BUNDLE_FROZEN=$BUNDLE_FROZEN
-# Install the exact Bundler version recorded in Gemfile.lock (BUNDLED WITH is
-# the last line) so older base images resolve the lockfile deterministically
-RUN gem install bundler:"$(tail -n1 Gemfile.lock | tr -d '[:space:]')" --no-document && \
+# Install the exact Bundler version recorded in Gemfile.lock (the line after
+# the BUNDLED WITH marker) so older base images resolve the lockfile
+# deterministically. Anchored on the marker rather than file position so
+# trailing lines can't break the parse. Note: whoever re-locks the file pins
+# the Bundler used here, and Bundler 2.7+ drops Ruby 3.1 support.
+RUN gem install bundler:"$(awk '/^BUNDLED WITH/ { getline; gsub(/[[:space:]]/, ""); print; exit }' Gemfile.lock)" --no-document && \
     bundle install
 
 # App source

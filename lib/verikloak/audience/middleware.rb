@@ -46,7 +46,7 @@ module Verikloak
         begin
           authorized = Checker.ok?(claims, @config)
         rescue Verikloak::Audience::ConfigurationError => e
-          return configuration_error_response(e)
+          return configuration_error_response(env, e)
         end
         return @app.call(env) if authorized
 
@@ -70,18 +70,23 @@ module Verikloak
         env[env_key] || env[env_key.to_sym] || {}
       end
 
-      # Render a configuration failure as a JSON error response instead of
-      # leaking a raw exception through the Rack stack. Boot-time validation
-      # normally prevents this path; it guards deployments where validation
-      # was skipped (e.g. unconfigured Rails boot).
+      # Log a configuration failure and render it as a generic JSON error
+      # response instead of leaking a raw exception through the Rack stack.
+      # The failure detail goes to the server log only, never to the client.
+      # Boot-time validation normally prevents this path; it guards
+      # deployments where validation was skipped (e.g. unconfigured Rails
+      # boot).
       #
+      # @param env [Hash] Rack environment
       # @param error [Verikloak::Audience::ConfigurationError]
       # @return [Array(Integer, Hash, #each)] Rack response triple
-      def configuration_error_response(error)
+      def configuration_error_response(env, error)
+        log_warning(env, "[verikloak-audience] configuration error: #{error.message}")
+
         Verikloak::ErrorResponse.build(
-          code: error.code || 'audience_configuration_error',
-          message: error.message,
-          status: error.http_status || 500
+          code: error.code,
+          message: 'audience configuration error',
+          status: error.http_status
         )
       end
 
@@ -94,9 +99,9 @@ module Verikloak
       def log_rejection(env, claims)
         return unless @config.suggest_in_logs
 
-        suggestion = Checker.suggest(claims, @config)
+        suggestion = Checker.suggest(claims, @config, fallback: nil)
         detail = suggestion ? "suggestion profile=:#{suggestion}" : 'no profile matches the observed aud'
-        aud_view = Array(claims.is_a?(Hash) ? claims['aud'] : nil).inspect
+        aud_view = Checker.observed_audiences(claims).inspect
         log_warning(env, "[verikloak-audience] insufficient_audience; #{detail} aud=#{aud_view}")
       end
 
@@ -120,18 +125,17 @@ module Verikloak
       # Determine whether configuration validation should run. This allows
       # Rails generators to boot without a fully-populated configuration since
       # the install task is responsible for creating it. Also skips validation
-      # when configuration is not explicitly set up.
+      # when configuration is not explicitly set up. The middleware's own
+      # (post-override) configuration decides the unconfigured case, so
+      # options passed to `use` are validated even when the global
+      # configuration is untouched.
       #
       # @return [Boolean]
       def skip_validation?
         return false unless defined?(::Verikloak::Audience::Railtie)
 
         railtie = ::Verikloak::Audience::Railtie
-        return railtie.skip_validation? if railtie.respond_to?(:skip_validation?)
-
-        # Fallback for partially-stubbed Railtie constants (e.g. in tests)
-        (railtie.respond_to?(:skip_configuration_validation?) && railtie.skip_configuration_validation?) ||
-          (railtie.respond_to?(:skip_unconfigured_validation?) && railtie.skip_unconfigured_validation?)
+        railtie.respond_to?(:skip_validation?) && railtie.skip_validation?(@config)
       end
 
       # Emit a warning for failed audience checks using request-scoped loggers

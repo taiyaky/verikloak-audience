@@ -21,7 +21,7 @@ Content-Type: application/json
 | Code                           | HTTP | Message template                                   | Trigger |
 |--------------------------------|------|----------------------------------------------------|---------|
 | `insufficient_audience`        | 403  | `Audience not acceptable for profile <profile>`    | Returned whenever the configured audience profile does not match the claims loaded from `env[config.env_claims_key]`. |
-| `audience_configuration_error` | 500  | `unknown audience profile <profile>` (or other configuration failure detail) | Returned when a configuration problem (e.g. an unknown `profile`) is detected while evaluating a request. Boot-time validation (`Configuration#validate!`) normally catches this before any request is served; this response guards deployments where validation was skipped (e.g. an unconfigured Rails boot). |
+| `audience_configuration_error` | 500  | `audience configuration error` | Returned when a configuration problem (e.g. an unknown `profile`) is detected while evaluating a request. The body stays generic; the failure detail (e.g. the invalid profile value) is written to the request logger only. Boot-time validation (`Configuration#validate!`) normally catches this before any request is served; this response guards deployments where validation was skipped (e.g. an unconfigured Rails boot). |
 
 ### Trigger details
 - Claims are read from `env[config.env_claims_key]` (default: `"verikloak.user"`). Missing claims are treated as `{}`.

@@ -31,9 +31,14 @@ RSpec.describe Verikloak::Audience::Checker do
     expect(described_class.suggest(claims, cfg)).to eq :any_match
   end
 
-  it "returns nil when no profile accepts the claims" do
+  it "falls back to :strict_single by default when no profile accepts the claims" do
     claims = { "aud" => ["unrelated"] }
-    expect(described_class.suggest(claims, cfg)).to be_nil
+    expect(described_class.suggest(claims, cfg)).to eq :strict_single
+  end
+
+  it "returns the given fallback when no profile accepts the claims" do
+    claims = { "aud" => ["unrelated"] }
+    expect(described_class.suggest(claims, cfg, fallback: nil)).to be_nil
   end
 end
 

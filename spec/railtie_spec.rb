@@ -399,6 +399,25 @@ RSpec.describe Verikloak::Audience::Railtie do
     Verikloak::Audience.instance_variable_set(:@config, original_config)
   end
 
+  it 'fails loudly at boot when verikloak-rails user_env_key is whitespace-only' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new('   ', nil)
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    # A present-but-blank key is a misconfiguration; the env_claims_key writer
+    # must reject it instead of the sync silently keeping the default key.
+    expect {
+      described_class.apply_verikloak_rails_configuration
+    }.to raise_error(Verikloak::Audience::ConfigurationError, /env_claims_key/)
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
   it 'derives required_aud and resource_client from verikloak-rails defaults when missing' do
     original_config = Verikloak::Audience.instance_variable_get(:@config)
     Verikloak::Audience.instance_variable_set(:@config, nil)
@@ -457,5 +476,20 @@ RSpec.describe Verikloak::Audience::Railtie do
     expect(config.skip_paths).to eq(['/custom/path'])
   ensure
     Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'reports unconfigured audiences for the given configuration and warns only once' do
+    described_class.unconfigured_warning_emitted = false
+
+    empty_cfg = Verikloak::Audience::Configuration.new
+    configured_cfg = Verikloak::Audience::Configuration.new.tap { |c| c.required_aud = ['rails-api'] }
+
+    expect(described_class).to receive(:warn_unconfigured).once
+
+    expect(described_class.audiences_unconfigured?(empty_cfg)).to be true
+    expect(described_class.audiences_unconfigured?(empty_cfg)).to be true
+    expect(described_class.audiences_unconfigured?(configured_cfg)).to be false
+  ensure
+    described_class.unconfigured_warning_emitted = false
   end
 end

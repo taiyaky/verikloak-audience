@@ -23,12 +23,7 @@ module Verikloak
       # @return [Boolean]
       def ok?(claims, cfg)
         claims = normalize_claims(claims)
-        profile = cfg.normalized_profile
-
-        unless VALID_PROFILES.include?(profile)
-          raise Verikloak::Audience::ConfigurationError,
-                "unknown audience profile #{cfg.profile.inspect}"
-        end
+        profile = cfg.validated_profile
 
         case profile
         when :strict_single
@@ -106,9 +101,11 @@ module Verikloak
       #
       # @param claims [Hash]
       # @param cfg [Verikloak::Audience::Configuration]
+      # @param fallback [Symbol, nil] value returned when no profile accepts
+      #   the claims (defaults to :strict_single, preserving the 1.0 contract)
       # @return [:strict_single, :allow_account, :any_match, :resource_or_aud, nil]
-      #   the most fitting profile, or nil when no profile accepts the claims
-      def suggest(claims, cfg)
+      #   the most fitting profile, or the fallback when none accepts
+      def suggest(claims, cfg, fallback: :strict_single)
         claims = normalize_claims(claims)
 
         required = cfg.required_aud_list
@@ -117,7 +114,16 @@ module Verikloak
         return :any_match if any_match?(claims, required)
         return :resource_or_aud if resource_or_aud?(claims, cfg.resource_client.to_s, required)
 
-        nil
+        fallback
+      end
+
+      # Audience values observed in the claims, normalized exactly like the
+      # profile checks normalize them (useful for consistent logging).
+      #
+      # @param claims [Object] raw claims value (Hash or #to_hash)
+      # @return [Array<String>]
+      def observed_audiences(claims)
+        normalized_audiences(normalize_claims(claims))
       end
 
       # Normalize incoming claims to a Hash to guard against unexpected

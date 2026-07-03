@@ -72,13 +72,29 @@ module Verikloak
 
       # Coerce `profile` into a Symbol, falling back to the default when unset.
       # Note that the result is not guaranteed to be a member of
-      # {VALID_PROFILES}; call {#validate!} to enforce that.
+      # {VALID_PROFILES}; use {#validated_profile} to enforce that.
       #
       # @return [Symbol]
       def normalized_profile
         value = profile
         value = value.to_sym if value.respond_to?(:to_sym)
         value.nil? ? DEFAULT_PROFILE : value
+      end
+
+      # Coerce `profile` into a Symbol and ensure it is one of
+      # {VALID_PROFILES}. Single source of the unknown-profile check shared
+      # by {#validate!} and {Verikloak::Audience::Checker.ok?}.
+      #
+      # @raise [ConfigurationError] when the profile is unknown
+      # @return [Symbol]
+      def validated_profile
+        profile_name = normalized_profile
+        unless VALID_PROFILES.include?(profile_name)
+          raise Verikloak::Audience::ConfigurationError,
+                "unknown audience profile #{profile.inspect}"
+        end
+
+        profile_name
       end
 
       # @param value [#to_s, nil]
@@ -108,11 +124,7 @@ module Verikloak
                 'required_aud must include at least one audience'
         end
 
-        profile_name = normalized_profile
-        unless VALID_PROFILES.include?(profile_name)
-          raise Verikloak::Audience::ConfigurationError,
-                "unknown audience profile #{profile.inspect}"
-        end
+        profile_name = validated_profile
 
         ensure_resource_client!(audiences) if profile_name == :resource_or_aud
 
