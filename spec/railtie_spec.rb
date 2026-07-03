@@ -399,7 +399,7 @@ RSpec.describe Verikloak::Audience::Railtie do
     Verikloak::Audience.instance_variable_set(:@config, original_config)
   end
 
-  it 'fails loudly at boot when verikloak-rails user_env_key is whitespace-only' do
+  it 'treats a whitespace-only verikloak-rails user_env_key as unset, matching effective_user_env_key' do
     original_config = Verikloak::Audience.instance_variable_get(:@config)
     Verikloak::Audience.instance_variable_set(:@config, nil)
 
@@ -409,11 +409,30 @@ RSpec.describe Verikloak::Audience::Railtie do
     end
     stub_const('Verikloak::Rails', rails_module)
 
-    # A present-but-blank key is a misconfiguration; the env_claims_key writer
-    # must reject it instead of the sync silently keeping the default key.
-    expect {
-      described_class.apply_verikloak_rails_configuration
-    }.to raise_error(Verikloak::Audience::ConfigurationError, /env_claims_key/)
+    # verikloak-rails resolves blank user_env_key to its default key for the
+    # core middleware, so keeping our identical default stays aligned with
+    # the env key the core middleware actually writes to.
+    described_class.apply_verikloak_rails_configuration
+
+    expect(Verikloak::Audience.config.env_claims_key)
+      .to eq(Verikloak::Audience::Configuration::DEFAULT_ENV_CLAIMS_KEY)
+  ensure
+    Verikloak::Audience.instance_variable_set(:@config, original_config)
+  end
+
+  it 'strips padded verikloak-rails user_env_key values like effective_user_env_key does' do
+    original_config = Verikloak::Audience.instance_variable_get(:@config)
+    Verikloak::Audience.instance_variable_set(:@config, nil)
+
+    rails_config = Struct.new(:user_env_key, :audience).new('  verikloak.custom  ', nil)
+    rails_module = Module.new do
+      define_singleton_method(:config) { rails_config }
+    end
+    stub_const('Verikloak::Rails', rails_module)
+
+    described_class.apply_verikloak_rails_configuration
+
+    expect(Verikloak::Audience.config.env_claims_key).to eq('verikloak.custom')
   ensure
     Verikloak::Audience.instance_variable_set(:@config, original_config)
   end

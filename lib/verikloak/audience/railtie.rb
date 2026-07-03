@@ -112,12 +112,12 @@ module Verikloak
       def sync_env_claims_key(cfg, rails_config)
         return unless rails_config.respond_to?(:user_env_key)
 
-        user_key = rails_config.user_env_key
-        # Skip only when verikloak-rails leaves the key unset. Present-but-blank
-        # values (e.g. an ENV var set to whitespace) flow through so the
-        # writer's validation rejects them loudly at boot instead of silently
-        # falling back to the default key.
-        return if user_key.nil? || user_key.to_s.empty?
+        # Resolve the key the same way verikloak-rails' #effective_user_env_key
+        # does (>= 1.2): strip whitespace and treat blank as unset. The core
+        # middleware then falls back to its default env key, which matches our
+        # default, so both middlewares stay aligned on the same key.
+        user_key = rails_config.user_env_key.to_s.strip
+        return if user_key.empty?
 
         # env_claims_key is never nil (its writer rejects nil), so only the
         # untouched default is eligible for syncing.

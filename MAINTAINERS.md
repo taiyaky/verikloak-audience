@@ -37,6 +37,6 @@ Release instructions for `verikloak-audience`. For contribution guidelines, see 
 
 ## Compatibility policy
 
-- Keep the runtime dependency pinned to the current major of the core gem (`verikloak ~> 1.0`).
+- Keep the runtime dependency pinned to the current minor floor of the core gem (currently `verikloak ~> 1.1`).
 - Supported Ruby versions follow the gemspec (`>= 3.1`); the CI matrix must cover every supported series.
 - Coordinate breaking changes with the other gems in the Verikloak family (verikloak, verikloak-rails, verikloak-bff, verikloak-pundit) so error hierarchies and Rack env keys stay aligned.

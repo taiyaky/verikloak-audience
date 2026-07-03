@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`Checker.suggest` accepts a `fallback:` keyword** (default `:strict_single`, preserving the 1.0 always-Symbol contract): the middleware passes `fallback: nil`, so rejection logs read `no profile matches the observed aud` instead of naming a misleading suggestion
 - **Middleware boot-time validation now evaluates the middleware's own (post-override) configuration**, so options passed via `config.middleware.use` are validated at startup even when the global configuration is untouched
-- Blank (whitespace-only) values from verikloak-rails are treated as unset when syncing `required_aud`/`resource_client`, while a present-but-blank `user_env_key` still fails loudly at boot
+- Values synced from verikloak-rails now follow its own resolution rules: `user_env_key` is whitespace-stripped and blank values are treated as unset (both middlewares then share the `verikloak.user` default, mirroring `effective_user_env_key` in verikloak-rails >= 1.2), and blank `required_aud`/`resource_client` are treated as unset
+- Runtime dependency raised to `verikloak ~> 1.1` (was `~> 1.0`); lockfile updated to verikloak 1.1.0
 - `Checker::VALID_PROFILES` is now an alias of `Configuration::VALID_PROFILES` (same values; the canonical definition moved)
 - All public checker predicates (`strict_single?`, `allow_account?`, `any_match?`) now coerce `required` inputs consistently, accepting Symbols and single values
 - `Railtie.skip_validation?` combines the generator-mode and unconfigured checks and takes the configuration under validation as an argument; the middleware and the after-initialize hook now share it
