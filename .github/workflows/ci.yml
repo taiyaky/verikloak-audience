@@ -14,31 +14,12 @@ on:
 
 jobs:
   rspec:
-    name: RSpec (Ruby ${{ matrix.ruby }})
+    name: RSpec
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       checks: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        # Cover every Ruby series supported by the gemspec (>= 3.1).
-        # Tags are pinned to patch + Alpine versions so CI stays
-        # deterministic; bump them intentionally.
-        include:
-          - ruby: "3.1"
-            ruby_image: ruby:3.1.7-alpine3.21
-          - ruby: "3.2"
-            ruby_image: ruby:3.2.11-alpine3.23
-          - ruby: "3.3"
-            ruby_image: ruby:3.3.11-alpine3.23
-          - ruby: "3.4"
-            ruby_image: ruby:3.4.8-alpine3.23
-
-    env:
-      RUBY_IMAGE: ${{ matrix.ruby_image }}
 
     steps:
       - name: Checkout source
@@ -64,7 +45,7 @@ jobs:
         uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
         if: always()
         with:
-          name: RSpec Reports (Ruby ${{ matrix.ruby }})
+          name: RSpec Reports
           path: tmp/rspec/results.xml
           reporter: java-junit
         continue-on-error: true
@@ -82,28 +63,40 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: rspec-coverage-ruby-${{ matrix.ruby }}
+          name: rspec-coverage
           path: artifacts/
 
-  # The main-branch ruleset requires a single status named "RSpec".
-  # This job aggregates the matrix legs so the required check keeps a
-  # stable name no matter how the matrix evolves.
-  rspec-summary:
-    name: RSpec
+  compatibility:
+    # Verifies the gemspec's `required_ruby_version >= 3.1` claim on every
+    # supported minor Ruby, mirroring verikloak core's CI layout: the
+    # docker-based `rspec` job covers the pinned development Ruby (3.4);
+    # this matrix covers the rest without docker. Unlike core, no
+    # compat.gemfile is needed because this Gemfile does not pin an
+    # interpreter, so the locked dependency set installs as-is.
+    name: RSpec (Ruby ${{ matrix.ruby }})
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: rspec
-    # Run even when a leg fails so the required check reports failure
-    # instead of being skipped (skipped checks would satisfy the ruleset).
-    if: always()
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.1', '3.2', '3.3']
 
     steps:
-      - name: Fail unless every RSpec matrix leg succeeded
-        env:
-          RSPEC_RESULT: ${{ needs.rspec.result }}
-        run: |
-          echo "RSpec matrix result: ${RSPEC_RESULT}"
-          [ "${RSPEC_RESULT}" = "success" ]
+      - name: Checkout source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1.316.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run RSpec
+        run: bundle exec rspec --format progress
 
   rubocop:
     name: RuboCop
