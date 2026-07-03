@@ -85,6 +85,26 @@ jobs:
           name: rspec-coverage-ruby-${{ matrix.ruby }}
           path: artifacts/
 
+  # The main-branch ruleset requires a single status named "RSpec".
+  # This job aggregates the matrix legs so the required check keeps a
+  # stable name no matter how the matrix evolves.
+  rspec-summary:
+    name: RSpec
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: rspec
+    # Run even when a leg fails so the required check reports failure
+    # instead of being skipped (skipped checks would satisfy the ruleset).
+    if: always()
+
+    steps:
+      - name: Fail unless every RSpec matrix leg succeeded
+        env:
+          RSPEC_RESULT: ${{ needs.rspec.result }}
+        run: |
+          echo "RSpec matrix result: ${RSPEC_RESULT}"
+          [ "${RSPEC_RESULT}" = "success" ]
+
   rubocop:
     name: RuboCop
     runs-on: ubuntu-latest
