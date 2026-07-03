@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-07-03
 
 ### Added
-- **Boot-time profile validation**: `Configuration#validate!` now rejects unknown `profile` values, so typos (e.g. `:strict_signle`) fail fast at startup instead of raising on the first request
+- **Boot-time profile validation**: `Configuration#validate!` now rejects unknown `profile` values, so misspellings (e.g. `:strict_signle` instead of `:strict_single`) fail fast at startup instead of raising on the first request
 - **`Configuration#normalized_profile` / `#validated_profile`**: Shared profile coercion and validation helpers (Symbol coercion, default fallback, unknown-profile check) used by both `validate!` and `Checker`
 - **JSON 500 for request-time configuration errors**: When a `ConfigurationError` surfaces during a request (normally prevented by boot-time validation), the middleware now renders a JSON error response (`audience_configuration_error`, status 500) instead of leaking the exception through the Rack stack; the response body stays generic and the failure detail is written to the request logger
 - **`Checker.observed_audiences`**: Public helper returning the normalized audience values seen in a claims payload, used by the middleware so rejection logs show the same audiences the checker evaluated (including duck-typed `#to_hash` claims)
-- **CI Ruby matrix**: RSpec now runs against Ruby 3.1 / 3.2 / 3.3 / 3.4 (all series supported by the gemspec)
+- **CI Ruby matrix**: RSpec now runs against Ruby 3.1 / 3.2 / 3.3 / 3.4 (all series supported by the gemspec) — the Docker-based job covers the development Ruby (3.4) and a non-Docker `ruby/setup-ruby` matrix covers 3.1–3.3, mirroring verikloak core's CI layout
 - **Coverage floor**: SimpleCov now enforces a minimum line coverage of 90% in CI (not enforced for focused local runs)
 - **MAINTAINERS.md**: Release instructions referenced from the README now exist
 - Tests for the `Forbidden`/`Error`/`ConfigurationError` classes, the Railtie `discovery_url` guard, the `REQUEST_PATH` fallback, and Symbol inputs to the public checker predicates

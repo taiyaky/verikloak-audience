@@ -4,9 +4,6 @@ services:
     build:
       context: .
       dockerfile: docker/dev.Dockerfile
-      args:
-        # Overridable base image so CI can run the suite across Ruby versions
-        RUBY_IMAGE: ${RUBY_IMAGE:-ruby:3.4.8-alpine3.23}
     environment:
       # Passed through from the host so CI can enable coverage reporting
       # and its minimum-coverage floor

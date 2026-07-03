@@ -1,7 +1,5 @@
 # docker/dev.Dockerfile
-# Overridable so CI can exercise every supported Ruby (>= 3.1) via a matrix
-ARG RUBY_IMAGE=ruby:3.4.8-alpine3.23
-FROM ${RUBY_IMAGE}
+FROM ruby:3.4.8-alpine3.23
 
 # Base packages:
 # - Runtime: bash (for CI commands), git (bundler-audit update), openssl (runtime lib), tzdata, libstdc++
@@ -31,13 +29,7 @@ COPY Gemfile Gemfile.lock ./
 # Faster, more reliable bundler installs
 ARG BUNDLE_FROZEN=1
 ENV BUNDLE_JOBS=4 BUNDLE_RETRY=3 BUNDLE_FROZEN=$BUNDLE_FROZEN
-# Install the exact Bundler version recorded in Gemfile.lock (the line after
-# the BUNDLED WITH marker) so older base images resolve the lockfile
-# deterministically. Anchored on the marker rather than file position so
-# trailing lines can't break the parse. Note: whoever re-locks the file pins
-# the Bundler used here, and Bundler 2.7+ drops Ruby 3.1 support.
-RUN gem install bundler:"$(awk '/^BUNDLED WITH/ { getline; gsub(/[[:space:]]/, ""); print; exit }' Gemfile.lock)" --no-document && \
-    bundle install
+RUN bundle install
 
 # App source
 COPY . .
